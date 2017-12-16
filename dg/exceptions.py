@@ -1,0 +1,10 @@
+__author__ = 'Viktor Kerkez <alefnula@gmail.com>'
+__date__ = ' 16 December 2017'
+__copyright__ = 'Copyright (c) 2017 Viktor Kerkez'
+
+
+class ConfigNotFound(Exception):
+    def __init__(self, path=None):
+        super().__init__(
+            f'Configuration file not found at the location: {path}'
+        )
