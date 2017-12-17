@@ -2,11 +2,14 @@ __author__ = 'Viktor Kerkez <alefnula@gmail.com>'
 __date__ = ' 16 December 2017'
 __copyright__ = 'Copyright (c) 2017 Viktor Kerkez'
 
+import io
 import os
+import yaml
 import subprocess
 from datetime import datetime
 from collections import OrderedDict
 from dg.exceptions import ConfigNotFound
+from dg.utils import nt
 from tea.utils import get_object
 from tea.dsa.config import Config as TeaConfig
 from tea.dsa.singleton import SingletonMetaclass
@@ -33,6 +36,51 @@ class Config(TeaConfig, metaclass=SingletonMetaclass):
 
         super().__init__(filename=config_file, fmt=Config.YAML,
                          auto_save=False)
+        # Load all models
+        self.models = self.__get_models()
+
+        # Load the meta file
+        meta_file = os.path.join(self.data_dir, self['datasets.meta'])
+        if os.path.isfile(meta_file):
+            with io.open(meta_file) as f:
+                self.meta = nt('Meta', yaml.safe_load(f))
+        else:
+            self.meta = nt('Meta', {})
+
+        # Load datasets
+        self.datasets = nt('Datasets', {
+            dataset: os.path.join(self.data_dir, self[f'datasets.{dataset}'])
+            for dataset in ['full_set', 'train_set', 'test_set', 'export_set']
+        })
+
+        # Load functions
+        self.functions = nt('Functions', {
+            name: get_object(path)
+            for name, path in self.get('functions', {}).items()
+        })
+
+    def __get_models(self):
+        """Return a dictionary of model name to model class mappings.
+
+        Returns:
+            dict: {model_name: model_class}
+        """
+        from dg.model import Model
+        module = get_object(f'{self.project_name}.models')
+        models = {
+            obj.__name__: obj
+            for obj in get_object(f'{self.project_name}.models.*')
+            if isinstance(obj, type) and issubclass(obj, Model)
+        }
+        if hasattr(module, '__all__'):
+            order = getattr(module, '__all__')
+        else:
+            order = sorted(models.keys())
+        return OrderedDict([
+            (model.name, model) for model in [
+                models[klass_name] for klass_name in order
+            ]
+        ])
 
     def get_model_dir(self, production=False, tensorflow=False):
         """Returns the model dir
@@ -68,25 +116,3 @@ class Config(TeaConfig, metaclass=SingletonMetaclass):
             os.makedirs(model_dir)
         return model_dir
 
-    def get_models(self):
-        """Return a dictionary of model name to model class mappings.
-
-        Returns:
-            dict: {model_name: model_class}
-        """
-        from dg.model import Model
-        module = get_object(f'{self.project_name}.models')
-        models = {
-            obj.__name__: obj
-            for obj in get_object(f'{self.project_name}.models.*')
-            if isinstance(obj, type) and issubclass(obj, Model)
-        }
-        if hasattr(module, '__all__'):
-            order = getattr(module, '__all__')
-        else:
-            order = sorted(models.keys())
-        return OrderedDict([
-            (model.name, model) for model in [
-                models[klass_name] for klass_name in order
-            ]
-        ])

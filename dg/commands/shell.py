@@ -16,6 +16,6 @@ def shell():
     }
     user_ns.update({
         model.__name__: model
-        for model in config.get_models().values()
+        for model in config.models.values()
     })
     embed(user_ns=user_ns)

@@ -2,8 +2,10 @@ __author__ = 'Viktor Kerkez <alefnula@gmail.com>'
 __date__ = ' 16 December 2017'
 __copyright__ = 'Copyright (c) 2017 Viktor Kerkez'
 
+import os
 import abc
 from dg.config import Config
+from dg.utils import ensure_dir
 
 
 class Model(metaclass=abc.ABCMeta):
@@ -51,12 +53,16 @@ class Model(metaclass=abc.ABCMeta):
         """Returns prediction for given features.
 
         Args:
-            features (pandas.DataFrame or dict): Data frame or dictionary of
-                features
+            features (dict): Dictionary of features
         Returns:
             numpy.ndarray: Array of predicted values
         """
         pass
+
+    def save_model(self, model_dir):
+        model_dir = os.path.join(model_dir, self.name)
+        ensure_dir(model_dir, directory=True)
+        self.save(model_dir)
 
     @abc.abstractmethod
     def save(self, model_dir):

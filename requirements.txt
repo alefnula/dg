@@ -1,3 +1,5 @@
 six==1.11.0
-tea==0.0.9
+tea==0.0.10
 pyyaml==3.12
+scikit-learn==0.19.1
+sanic==0.6.0

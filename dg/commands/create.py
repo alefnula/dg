@@ -26,7 +26,25 @@ dg
 '''
 
 CONFIG = '''\
-models:
+models: {{}}
+
+grid: {{}}
+
+datasets:
+    meta: clean/meta.yaml
+    full_set: clean/dataset.csv
+    train_set: evaluation/train.csv
+    test_set: evaluation/test.csv
+    export: export/export.csv
+
+functions:
+  export: {project_name}.export.export
+
+server:
+  klass: {project_name}.server.Server
+  host: 127.0.0.1
+  port: 8001
+  params: {{}}
 '''
 
 
@@ -39,7 +57,7 @@ def create(project=None, author=None, email=None):
         email (str): Author's email address
     """
     if project is None:
-        project_name = input('Project name:')
+        project_name = input('Project name: ')
         project_dir = os.path.abspath(os.path.join(os.getcwd(), project_name))
     else:
         project_name = os.path.basename(project)
@@ -51,10 +69,10 @@ def create(project=None, author=None, email=None):
             )
 
     if author is None:
-        author = input('Author:')
+        author = input('Author: ')
 
     if email is None:
-        email = input('Email:')
+        email = input('Email: ')
 
     # Create the project skeleton
     print(f'Creating project: {project_dir}')
@@ -67,7 +85,7 @@ def create(project=None, author=None, email=None):
     config_dir = os.path.join(project_dir, 'config')
     shell.mkdir(config_dir)
     shell.touch(os.path.join(config_dir, f'{project_name}.yaml'),
-                content=CONFIG)
+                content=CONFIG.format(project_name=project_name))
     # Create data directory
     data_dir = os.path.join(project_dir, 'data')
     shell.mkdir(data_dir)
