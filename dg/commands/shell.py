@@ -2,18 +2,18 @@ __author__ = 'Viktor Kerkez <alefnula@gmail.com>'
 __date__ = ' 16 December 2017'
 __copyright__ = 'Copyright (c) 2017 Viktor Kerkez'
 
-from dg.config import Config
+import dg
 
 
-def shell():
+@dg.command
+def shell(user_ns=None):
     """Run IPython shell with loaded configuration and model classes
     """
     from IPython import embed
+    user_ns = user_ns or {}
 
-    config = Config()
-    user_ns = {
-        'config': config,
-    }
+    config = dg.Config()
+    user_ns['config'] = config
     user_ns.update({
         model.__name__: model
         for model in config.models.values()

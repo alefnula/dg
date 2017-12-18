@@ -3,7 +3,6 @@ __date__ = ' 16 December 2017'
 __copyright__ = 'Copyright (c)  2017 Viktor Kerkez'
 
 import dg
-import pandas as pd
 from dg.utils import bar
 
 
@@ -108,6 +107,7 @@ def evaluate(models, train_set=None, test_set=None, verbose=False):
             model, train_set=train_set, test_set=test_set, verbose=verbose
         ))
         bar(verbose=verbose)
+    import pandas as pd
 
     df = pd.DataFrame(metrics)
     df.insert(0, 'model', df.pop('model'))
@@ -135,6 +135,8 @@ def train_and_evaluate(models, train_set=None, test_set=None, verbose=False):
             model, train_set=train_set, test_set=test_set, verbose=verbose
         ))
         bar(verbose=verbose)
+    import pandas as pd
+
     df = pd.DataFrame(metrics)
     df.insert(0, 'model', df.pop('model'))
     return df

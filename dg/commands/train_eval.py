@@ -7,6 +7,14 @@ from dg import train_eval
 from dg.utils import print_and_save_df
 
 
+@dg.command
+@dg.argument('-m', '--model', action='append',
+             help='Models to train. Default: all models')
+@dg.argument('-p', '--production', action='store_true',
+             help='Train for production not for evaluation')
+@dg.argument('-e', '--export', action='store_true',
+             help='Train for production from database export')
+@dg.argument('-v', '--verbose', action='store_true', help='Print details')
 def train(models=None, production=False, export=False, verbose=True):
     """Train all model for production and save them
 
@@ -28,6 +36,13 @@ def train(models=None, production=False, export=False, verbose=True):
     train_eval.train(models, dataset, verbose=verbose)
 
 
+@dg.command
+@dg.argument('-m', '--model', action='append',
+             help='Models to evaluate. Default: all models')
+@dg.argument('-t', '--test-only', action='store_true',
+             help='Evaluate only on test data')
+@dg.argument('-o', '--output', help='Path to the output csv file')
+@dg.argument('-v', '--verbose', action='store_true', help='Print details')
 def evaluate(models=None, test_only=False, output=None, verbose=False):
     """Evaluate all models and print out the metrics for evaluation.
 
@@ -48,6 +63,13 @@ def evaluate(models=None, test_only=False, output=None, verbose=False):
     print_and_save_df(df, output=output)
 
 
+@dg.command
+@dg.argument('-m', '--model', action='append',
+             help='Models to train and evaluate. Default: all models')
+@dg.argument('-t', '--test-only', action='store_true',
+             help='Evaluate only on test data')
+@dg.argument('-o', '--output', help='Path to the output csv file')
+@dg.argument('-v', '--verbose', action='store_true', help='Print details')
 def train_and_evaluate(models=None, test_only=False, output=None,
                        verbose=False):
     """Train end evaluate models and print out the metrics for evaluation

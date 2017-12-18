@@ -6,6 +6,7 @@ import dg
 from tea.utils import get_object
 
 
+@dg.command
 def serve():
     """Serve models"""
     config = dg.Config()

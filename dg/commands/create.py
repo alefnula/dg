@@ -2,9 +2,11 @@ __author__ = 'Viktor Kerkez <alefnula@gmail.com>'
 __date__ = ' 16 December 2017'
 __copyright__ = 'Copyright (c) 2017 Viktor Kerkez'
 
+import dg
 import os
 from tea import shell
 from datetime import datetime
+
 
 GIT_IGNORE = '''\
 *.py[cod]
@@ -35,7 +37,7 @@ datasets:
     full_set: clean/dataset.csv
     train_set: evaluation/train.csv
     test_set: evaluation/test.csv
-    export: export/export.csv
+    export_set: export/export.csv
 
 functions:
   export: {project_name}.export.export
@@ -48,6 +50,10 @@ server:
 '''
 
 
+@dg.command
+@dg.argument('project', help='Project name or path to the project dir')
+@dg.argument('-a', '--author', help='Author\'s full name')
+@dg.argument('-e', '--email', help='Author\'s email address')
 def create(project=None, author=None, email=None):
     """Creates the project skeleton.
 
@@ -81,21 +87,30 @@ def create(project=None, author=None, email=None):
                 content=GIT_IGNORE)
     shell.touch(os.path.join(project_dir, 'requirements.txt'),
                 content=REQUIREMENTS)
+
     # Create configuration
     config_dir = os.path.join(project_dir, 'config')
     shell.mkdir(config_dir)
     shell.touch(os.path.join(config_dir, f'{project_name}.yaml'),
                 content=CONFIG.format(project_name=project_name))
+
     # Create data directory
     data_dir = os.path.join(project_dir, 'data')
     shell.mkdir(data_dir)
     shell.touch(os.path.join(data_dir, '.keep'))
+
     # Create models directory
     models_dir = os.path.join(project_dir, 'models')
     shell.mkdir(models_dir)
     shell.touch(os.path.join(models_dir, '.keep'))
-    shell.mkdir(os.path.join(project_dir, project_name))
+
+    # Create notebooks directory
+    models_dir = os.path.join(project_dir, 'notebooks')
+    shell.mkdir(models_dir)
+    shell.touch(os.path.join(models_dir, '.keep'))
+
     # Create the app
+    shell.mkdir(os.path.join(project_dir, project_name))
     signature = SIGNATURE.format(author=author, email=email,
                                  now=datetime.now())
     app_dir = os.path.join(project_dir, project_name)

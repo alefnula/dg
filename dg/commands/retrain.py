@@ -3,11 +3,13 @@ __date__ = ' 13 December 2017'
 __copyright__ = 'Copyright (c)  2017 Viktor Kerkez'
 
 import dg
-import requests
-from dg.commands.deploy import deploy
+from tea.utils import get_object
 from dg.train_eval import train
+from dg.commands.deploy import deploy
 
 
+@dg.command
+@dg.argument('-v', '--verbose', action='store_true', help='Print details')
 def retrain(verbose=False):
     """"Retrain the production model.
 
@@ -18,7 +20,7 @@ def retrain(verbose=False):
     """
     # First export the data
     config = dg.Config()
-    export_fn = config.functions.export
+    export_fn = get_object(config.functions.export)
 
     if verbose:
         print('Exporting the data')
@@ -33,6 +35,7 @@ def retrain(verbose=False):
     if verbose:
         print('Sending signal to the server to reload models')
     try:
+        import requests
         requests.post('http://{host}:{port}/reload/'.format(
             host=config['nextflix.host'], port=config['nextflix.port']
         ))

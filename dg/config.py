@@ -54,10 +54,7 @@ class Config(TeaConfig, metaclass=SingletonMetaclass):
         })
 
         # Load functions
-        self.functions = nt('Functions', {
-            name: get_object(path)
-            for name, path in self.get('functions', {}).items()
-        })
+        self.functions = nt('Functions', self.get('functions', {}))
 
     def __get_models(self):
         """Return a dictionary of model name to model class mappings.

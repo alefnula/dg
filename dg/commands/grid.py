@@ -2,15 +2,15 @@ __author__ = 'Viktor Kerkez <alefnula@gmail.com>'
 __date__ = ' 09 December 2017'
 __copyright__ = 'Copyright (c)  2017 Viktor Kerkez'
 
-import pandas as pd
 from copy import deepcopy
-from sklearn.model_selection import ParameterGrid
 import dg
 from dg.utils import bar, print_and_save_df
 from dg.train_eval import train_model, evaluate_model
 
 
 def create_grid(params, grid_params):
+    from sklearn.model_selection import ParameterGrid
+
     grid_params = deepcopy(grid_params)
     for key, value in params.items():
         if key not in grid_params:
@@ -18,6 +18,13 @@ def create_grid(params, grid_params):
     return list(ParameterGrid(grid_params))
 
 
+@dg.command
+@dg.argument('-m', '--model', required=True,
+             help='Model to train and eval. Default: all models')
+@dg.argument('-t', '--test-only', action='store_true',
+             help='Evaluate only on test data')
+@dg.argument('-o', '--output', help='Path to the output csv file')
+@dg.argument('-v', '--verbose', action='store_true', help='Print details')
 def grid(model, test_only=False, output=None, verbose=True):
     """Implement grid search for model
 
@@ -57,6 +64,7 @@ def grid(model, test_only=False, output=None, verbose=True):
         row.update(m)
         metrics.append(row)
         bar(verbose=verbose)
+    import pandas as pd
 
     df = pd.DataFrame(metrics)
     all_columns = set(df.columns.tolist())
