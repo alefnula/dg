@@ -21,14 +21,18 @@ class Config(TeaConfig, metaclass=SingletonMetaclass):
     Attributes:
         data_dir (str): Path to the data directory
     """
-    def __init__(self):
+    def __init__(self, path=None):
+        """
+        Args:
+            path (str): Path to the configuration file
+        """
         #: Data directory
         self.project_dir = os.path.abspath(os.getcwd())
         self.project_name = os.path.basename(self.project_dir)
         self.data_dir = os.path.join(self.project_dir, 'data')
 
         # Read nextflix.yaml
-        config_file = os.path.join(
+        config_file = path if path is not None else os.path.join(
             self.project_dir, 'config', f'{self.project_name}.yaml'
         )
         if not os.path.isfile(config_file):
