@@ -2,6 +2,7 @@ __author__ = 'Viktor Kerkez <alefnula@gmail.com>'
 __date__ = ' 16 December 2017'
 __copyright__ = 'Copyright (c) 2017 Viktor Kerkez'
 
+import os
 import sys
 import logging
 import argparse
@@ -15,6 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 def main():
+    # For some reason current working directory is not in the python path
+    # when dg is installed with pip
+    cwd = os.getcwd()
+    if cwd not in sys.path:
+        sys.path.append(cwd)
+
     parser = argparse.ArgumentParser(prog='dg')
     subparsers = parser.add_subparsers(dest='parser', help='commands')
 
