@@ -128,8 +128,10 @@ class TensorflowModel(Model, metaclass=abc.ABCMeta):
         config = tf.estimator.RunConfig(
             tf_random_seed=42,
             model_dir=model_dir,
-            save_summary_steps=100,
-            save_checkpoints_steps=1000,
+            save_summary_steps=tf_params.get('save_summary_steps', 100),
+            save_checkpoints_steps=tf_params.get(
+                'save_checkpoints_steps', 1000
+            ),
         )
         return tf.estimator.Estimator(
             model_fn=self.model_fn, config=config, params=tf_params

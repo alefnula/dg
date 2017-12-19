@@ -14,7 +14,9 @@ GIT_IGNORE = '''\
 .vscode
 .ipynb_checkpoints
 data/*
+!data/.keep
 models/*
+!models/.keep
 '''
 
 SIGNATURE = '''\
