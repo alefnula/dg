@@ -8,7 +8,7 @@ from dg.utils import print_and_save_df
 
 
 @dg.command
-@dg.argument('-m', '--model', action='append',
+@dg.argument('-m', '--model', action='append', dest='models',
              help='Models to train. Default: all models')
 @dg.argument('-p', '--production', action='store_true',
              help='Train for production not for evaluation')
@@ -26,18 +26,19 @@ def train(models=None, production=False, export=False, verbose=True):
         verbose (bool): Print details
     """
     config = dg.Config()
-    dataset = (
+    train_set = (
         config.datasets.export if export else (
             config.datasets.full_set if production else
             config.datasets.train_set
         )
     )
+    eval_set = config.datasets.eval_set
     models = models or config.models.keys()
-    train_eval.train(models, dataset, verbose=verbose)
+    train_eval.train(models, train_set, eval_set, verbose=verbose)
 
 
 @dg.command
-@dg.argument('-m', '--model', action='append',
+@dg.argument('-m', '--model', action='append', dest='models',
              help='Models to evaluate. Default: all models')
 @dg.argument('-t', '--test-only', action='store_true',
              help='Evaluate only on test data')
@@ -58,13 +59,16 @@ def evaluate(models=None, test_only=False, output=None, verbose=False):
     config = dg.Config()
     models = models or config.models.keys()
     df = train_eval.evaluate(
-        models, train_set=None if test_only else config.datasets.train_set,
-        test_set=config.datasets.test_set, verbose=verbose)
+        models,
+        train_set=None if test_only else config.datasets.train_set,
+        eval_set=config.datasets.eval_set,
+        test_set=config.datasets.test_set,
+        verbose=verbose)
     print_and_save_df(df, output=output)
 
 
 @dg.command
-@dg.argument('-m', '--model', action='append',
+@dg.argument('-m', '--model', action='append', dest='models',
              help='Models to train and evaluate. Default: all models')
 @dg.argument('-t', '--test-only', action='store_true',
              help='Evaluate only on test data')
@@ -84,6 +88,9 @@ def train_and_evaluate(models=None, test_only=False, output=None,
     config = dg.Config()
     models = models or config.models.keys()
     df = train_eval.train_and_evaluate(
-        models, train_set=None if test_only else config.datasets.train_set,
-        test_set=config.datasets.test_set, verbose=verbose)
+        models,
+        train_set=None if test_only else config.datasets.train_set,
+        eval_set=config.datasets.eval_set,
+        test_set=config.datasets.test_set,
+        verbose=verbose)
     print_and_save_df(df, output=output)

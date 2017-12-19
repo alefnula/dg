@@ -27,21 +27,31 @@ class Config(TeaConfig, metaclass=SingletonMetaclass):
             path (str): Path to the configuration file
         """
         #: Data directory
-        self.project_dir = os.path.abspath(os.getcwd())
-        self.project_name = os.path.basename(self.project_dir)
-        self.data_dir = os.path.join(self.project_dir, 'data')
+        if path is None:
+            # Calculate project directory from the current working dir
+            self.project_dir = os.path.abspath(os.getcwd())
+            # Get the project name
+            self.project_name = os.path.basename(self.project_dir)
+            config_file = os.path.join(self.project_dir, 'config',
+                                       f'{self.project_name}.yaml')
+        else:
+            path = os.path.abspath(path)
+            # Calculate project directory relative to the config path
+            self.project_dir = os.path.dirname(os.path.dirname(path))
+            # Get the project name
+            self.project_name = os.path.basename(self.project_dir)
+            config_file = path
 
-        # Read nextflix.yaml
-        config_file = path if path is not None else os.path.join(
-            self.project_dir, 'config', f'{self.project_name}.yaml'
-        )
         if not os.path.isfile(config_file):
             raise ConfigNotFound(config_file)
 
+        # Get the data dir
+        self.data_dir = os.path.join(self.project_dir, 'data')
+
         super().__init__(filename=config_file, fmt=Config.YAML,
                          auto_save=False)
-        # Load all models
-        self.models = self.__get_models()
+
+        self.__models = None
 
         # Load the meta file
         meta_file = os.path.join(self.data_dir, self['datasets.meta'])
@@ -54,34 +64,37 @@ class Config(TeaConfig, metaclass=SingletonMetaclass):
         # Load datasets
         self.datasets = nt('Datasets', {
             dataset: os.path.join(self.data_dir, self[f'datasets.{dataset}'])
-            for dataset in ['full_set', 'train_set', 'test_set', 'export_set']
+            for dataset in self.get('datasets', {}).keys()
         })
 
         # Load functions
         self.functions = nt('Functions', self.get('functions', {}))
 
-    def __get_models(self):
+    @property
+    def models(self):
         """Return a dictionary of model name to model class mappings.
 
         Returns:
             dict: {model_name: model_class}
         """
-        from dg.model import Model
-        module = get_object(f'{self.project_name}.models')
-        models = {
-            obj.__name__: obj
-            for obj in get_object(f'{self.project_name}.models.*')
-            if isinstance(obj, type) and issubclass(obj, Model)
-        }
-        if hasattr(module, '__all__'):
-            order = getattr(module, '__all__')
-        else:
-            order = sorted(models.keys())
-        return OrderedDict([
-            (model.name, model) for model in [
-                models[klass_name] for klass_name in order
-            ]
-        ])
+        if self.__models is None:
+            from dg.model import Model
+            module = get_object(f'{self.project_name}.models')
+            models = {
+                obj.__name__: obj
+                for obj in get_object(f'{self.project_name}.models.*')
+                if isinstance(obj, type) and issubclass(obj, Model)
+            }
+            if hasattr(module, '__all__'):
+                order = getattr(module, '__all__')
+            else:
+                order = sorted(models.keys())
+            self.__models = OrderedDict([
+                (model.name, model) for model in [
+                    models[klass_name] for klass_name in order
+                ]
+            ])
+        return self.__models
 
     def get_model_dir(self, production=False, tensorflow=False):
         """Returns the model dir

@@ -46,6 +46,7 @@ def grid(model, test_only=False, output=None, verbose=True):
         return
 
     train_set = config.datasets.train_set
+    eval_set = config.datasets.eval_set
     test_set = config.datasets.test_set
 
     metrics = []
@@ -56,9 +57,10 @@ def grid(model, test_only=False, output=None, verbose=True):
             print(f'Params: {params}')
         row = params.copy()
         instance = config.models[model](params)
-        train_model(instance, train_set)
+        train_model(instance, train_set, eval_set)
         m = evaluate_model(instance,
                            train_set=None if test_only else train_set,
+                           eval_set=eval_set,
                            test_set=test_set)
         m.pop('model')
         row.update(m)

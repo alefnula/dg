@@ -33,11 +33,12 @@ class Model(metaclass=abc.ABCMeta):
         return self.name
 
     @abc.abstractmethod
-    def train(self, dataset):
+    def train(self, train_set, eval_set=None):
         """Train the model.
 
         Args:
-            dataset (str): Path to the training dataset
+            train_set (str): Path to the training dataset
+            eval_set (str) Optional path to the evaluation set
         """
         pass
 
@@ -134,16 +135,15 @@ class TensorflowModel(Model, metaclass=abc.ABCMeta):
             model_fn=self.model_fn, config=config, params=tf_params
         )
 
-    def train(self, dataset):
+    def train(self, train_set, eval_set=None):
         import tensorflow as tf
 
         self.model_dir = self.config.get_model_dir(tensorflow=True)
         self.estimator = self.__create_estimator(self.model_dir)
-        train_fn = self.input_fn(dataset)
         experiment = tf.contrib.learn.Experiment(
             estimator=self.estimator,
-            train_input_fn=train_fn,
-            eval_input_fn=lambda: None,
+            train_input_fn=self.input_fn(train_set),
+            eval_input_fn=self.input_fn(eval_set) if eval_set else lambda: None
         )
         experiment.train()
 

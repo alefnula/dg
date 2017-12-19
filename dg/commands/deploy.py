@@ -11,7 +11,7 @@ from dg.utils import ensure_dir, bar
 
 
 @dg.command
-@dg.argument('-m', '--model', action='append',
+@dg.argument('-m', '--model', action='append', dest='models',
              help='Models do deploy. Default: All found models')
 @dg.argument('-v', '--verbose', action='store_true', help='Print details')
 def deploy(models=None, verbose=False):

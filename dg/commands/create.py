@@ -36,6 +36,7 @@ datasets:
     meta: clean/meta.yaml
     full_set: clean/dataset.csv
     train_set: evaluation/train.csv
+    eval_set: evaluation/eval.csv
     test_set: evaluation/test.csv
     export_set: export/export.csv
 

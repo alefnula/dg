@@ -6,32 +6,35 @@ import dg
 from dg.utils import bar
 
 
-def train_model(model, dataset, model_dir=None, save=False, verbose=False):
+def train_model(model, train_set, eval_set=None, model_dir=None, save=False,
+                verbose=False):
     """Train a single model and save it
 
     Args:
         model: Model to train
-        dataset (str): Path to the training dataset
+        train_set (str): Path to the training dataset
+        eval_set (str): Optional path to the evaluation dataset
         model_dir (str): Path to the directory where the model should be saved
         save (bool): Save the model
         verbose (bool): Print details
     """
     if verbose:
         print('Training:', model)
-    model.train(dataset)
+    model.train(train_set, eval_set)
     if save:
         if verbose:
             print('Saving:', model)
         model.save_model(model_dir)
 
 
-def train(models, dataset, verbose=False):
+def train(models, train_set, eval_set=None, verbose=False):
     """Train all model for production and save them
 
     Args:
         models (list of str): Model names. Pass if you want to train a just a
             set particular models
-        dataset (str): Path to the training dataset
+        train_set (str): Path to the training dataset
+        eval_set (str): Optional path to the evaluation dataset
         verbose (bool): Print details
     """
     config = dg.Config()
@@ -41,28 +44,42 @@ def train(models, dataset, verbose=False):
     bar(verbose=verbose)
     for name in models:
         model = config.models[name]()
-        train_model(model, dataset, model_dir, save=True, verbose=verbose)
+        train_model(
+            model, train_set, eval_set, model_dir, save=True, verbose=verbose
+        )
         bar(verbose=verbose)
 
 
 def print_metrics(metrics):
     """Pretty print the metrics"""
-    trains = sorted([key for key in metrics if key.startswith('train-')])
-    tests = sorted([key for key in metrics if key.startswith('test-')])
-    print('Train:')
-    for key in trains:
-        print(f'\t{key.split("-")[-1]}:\t{metrics[key]:.4f}')
-    print('Test:')
-    for key in tests:
-        print(f'\t{key.split("-")[-1]}:\t{metrics[key]:.4f}')
+    train_keys = sorted([key for key in metrics if key.startswith('train-')])
+    eval_keys = sorted([key for key in metrics if key.startswith('eval-')])
+    test_keys = sorted([key for key in metrics if key.startswith('test-')])
+
+    if train_keys:
+        print('Train:')
+        for key in train_keys:
+            print(f'\t{key.split("-")[-1]}:\t{metrics[key]:.4f}')
+
+    if eval_keys:
+        print('Eval:')
+        for key in eval_keys:
+            print(f'\t{key.split("-")[-1]}:\t{metrics[key]:.4f}')
+
+    if test_keys:
+        print('Test:')
+        for key in test_keys:
+            print(f'\t{key.split("-")[-1]}:\t{metrics[key]:.4f}')
 
 
-def evaluate_model(model, train_set=None, test_set=None, verbose=False):
+def evaluate_model(model, train_set=None, eval_set=None, test_set=None,
+                   verbose=False):
     """Evaluate a single model
 
     Args:
         model: Model to evaluate
         train_set (str): Path to the training dataset
+        eval_set (str): Optional path to the evaluation dataset
         test_set (str): Path to the test dataset
         verbose (bool): Print details
     Returns:
@@ -76,6 +93,11 @@ def evaluate_model(model, train_set=None, test_set=None, verbose=False):
         for key in train_eval:
             metrics[f'train-{key}'] = train_eval[key]
 
+    if eval_set is not None:
+        eval_eval = model.evaluate(eval_set)
+        for key in eval_eval:
+            metrics[f'eval-{key}'] = eval_eval[key]
+
     if test_set is not None:
         test_eval = model.evaluate(test_set)
         for key in test_eval:
@@ -85,7 +107,8 @@ def evaluate_model(model, train_set=None, test_set=None, verbose=False):
     return metrics
 
 
-def evaluate(models, train_set=None, test_set=None, verbose=False):
+def evaluate(models, train_set=None, eval_set=None, test_set=None,
+             verbose=False):
     """Evaluate all models and print out the metrics for evaluation.
 
     Evaluation is using the production model.
@@ -94,6 +117,7 @@ def evaluate(models, train_set=None, test_set=None, verbose=False):
         models (list of str): Model names. Pass if you want to evaluate just a
             set of particular models.
         train_set (str): Path to the training dataset
+        eval_set (str): Optional path to the evaluation dataset
         test_set (str): Path to the test dataset
         verbose (bool): Print details
     """
@@ -104,7 +128,8 @@ def evaluate(models, train_set=None, test_set=None, verbose=False):
         model = config.models[name]()
         model.load()
         metrics.append(evaluate_model(
-            model, train_set=train_set, test_set=test_set, verbose=verbose
+            model, train_set=train_set, eval_set=eval_set, test_set=test_set,
+            verbose=verbose
         ))
         bar(verbose=verbose)
     import pandas as pd
@@ -114,13 +139,15 @@ def evaluate(models, train_set=None, test_set=None, verbose=False):
     return df
 
 
-def train_and_evaluate(models, train_set=None, test_set=None, verbose=False):
+def train_and_evaluate(models, train_set=None, eval_set=None, test_set=None,
+                       verbose=False):
     """Train end evaluate models and print out the metrics for evaluation
 
     Args:
         models (list of str): Model names. Pass if you want to train/evaluate
             just a set of particular models
         train_set (str): Path to the training dataset
+        eval_set (str): Optional path to the evaluation dataset
         test_set (str): Path to the test dataset
         verbose (bool): Print details
 
@@ -130,9 +157,10 @@ def train_and_evaluate(models, train_set=None, test_set=None, verbose=False):
     bar(verbose=verbose)
     for name in models:
         model = config.models[name]()
-        train_model(model, train_set, save=False, verbose=verbose)
+        train_model(model, train_set, eval_set, save=False, verbose=verbose)
         metrics.append(evaluate_model(
-            model, train_set=train_set, test_set=test_set, verbose=verbose
+            model, train_set=train_set, eval_set=eval_set, test_set=test_set,
+            verbose=verbose
         ))
         bar(verbose=verbose)
     import pandas as pd
