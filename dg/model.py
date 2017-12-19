@@ -145,7 +145,10 @@ class TensorflowModel(Model, metaclass=abc.ABCMeta):
             train_input_fn=self.input_fn(train_set),
             eval_input_fn=self.input_fn(eval_set) if eval_set else lambda: None
         )
-        experiment.train()
+        if eval_set:
+            experiment.train_and_evaluate()
+        else:
+            experiment.train()
 
     def predict(self, features):
         import numpy as np
