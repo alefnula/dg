@@ -3,7 +3,6 @@ __date__ = ' 16 December 2017'
 __copyright__ = 'Copyright (c)  2017 Viktor Kerkez'
 
 import os
-from collections import namedtuple
 
 
 def ensure_dir(path, directory=False):
@@ -39,18 +38,6 @@ def print_and_save_df(df, output=None):
     print(df.to_string(justify='right', float_format='%.4f'))
 
 
-def nt(name, data):
-    """Creates a namedtuple klass from a dictionary and returns an instance
-    of that class populated with the values from the dictionary.
-
-    Args:
-        name (str): Class name
-        data (dict): Named tuple data
-    """
-    klass = namedtuple(name, sorted(data.keys()))
-    return klass(**data)
-
-
 def bar(n=79, verbose=True):
     """Prints a horizontal bar
 
@@ -60,3 +47,20 @@ def bar(n=79, verbose=True):
     """
     if verbose:
         print('\n' + '-' * n + '\n')
+
+
+def feature_cols(cols, target_cols):
+    """Remove target columns from columns and leave feature columns in the
+    same order as they were.
+
+    Args:
+        cols (list, pandas.Series): All columns
+        target_cols: (list): Target columns
+    Returns:
+        list: Feature columns
+    """
+    cols = list(cols)
+    for tc in target_cols:
+        if tc in cols:
+            cols.remove(tc)
+    return cols

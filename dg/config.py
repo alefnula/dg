@@ -9,13 +9,12 @@ import subprocess
 from datetime import datetime
 from collections import OrderedDict
 from dg.exceptions import ConfigNotFound
-from dg.utils import nt
 from tea.utils import get_object
-from tea.dsa.config import Config as TeaConfig
-from tea.dsa.singleton import SingletonMetaclass
+from tea.dsa.dicts import DictObject
+from tea.dsa.singleton import Singleton
 
 
-class Config(TeaConfig, metaclass=SingletonMetaclass):
+class Config(Singleton):
     """Configuration class
 
     Attributes:
@@ -47,9 +46,10 @@ class Config(TeaConfig, metaclass=SingletonMetaclass):
 
         # Get the data dir
         self.data_dir = os.path.join(self.project_dir, 'data')
+        self.models_dir = os.path.join(self.project_dir, 'models')
 
-        super().__init__(filename=config_file, fmt=Config.YAML,
-                         auto_save=False)
+        with io.open(config_file, 'r', encoding='utf-8') as f:
+            self.data = yaml.safe_load(f)
 
         self.__models = None
 
@@ -57,18 +57,55 @@ class Config(TeaConfig, metaclass=SingletonMetaclass):
         meta_file = os.path.join(self.data_dir, self['datasets.meta'])
         if os.path.isfile(meta_file):
             with io.open(meta_file) as f:
-                self.meta = nt('Meta', yaml.safe_load(f))
+                self.meta = yaml.safe_load(f)
         else:
-            self.meta = nt('Meta', {})
+            self.meta = {}
 
         # Load datasets
-        self.datasets = nt('Datasets', {
-            dataset: os.path.join(self.data_dir, self[f'datasets.{dataset}'])
+        self.datasets = {
+            dataset: (
+                os.path.join(self.data_dir, self[f'datasets.{dataset}'])
+                if self[f'datasets.{dataset}'] is not None else None
+            )
             for dataset in self.get('datasets', {}).keys()
-        })
+        }
 
         # Load functions
-        self.functions = nt('Functions', self.get('functions', {}))
+        self.functions = self.get('functions', {})
+
+    def __get(self, var):
+        current = self.data
+        for part in var.split('.'):
+            if isinstance(current, dict):
+                current = current[part]
+            elif isinstance(current, list):
+                part = int(part, 10)
+                current = current[part]
+            else:
+                raise KeyError(var)
+        return current
+
+    def __getitem__(self, item):
+        """Unsafe version, may raise KeyError or IndexError"""
+        return self.__get(item)
+
+    def get(self, var, default=None):
+        """Safe version which always returns a default value"""
+        try:
+            return self.__get(var)
+        except (KeyError, IndexError):
+            return default
+
+    def get_params(self, name):
+        """Returns the configuration parameters for the estimator.
+
+        Args:
+            name (str): Name of the estimator
+
+        Returns:
+            dict: Dictionary of parameters
+        """
+        return self[f'models.{name}']
 
     @property
     def models(self):
@@ -114,7 +151,7 @@ class Config(TeaConfig, metaclass=SingletonMetaclass):
                     {project_root}/models/{timestamp}-{git-rev}
 
         """
-        model_dir = os.path.join(self.project_dir, 'models')
+        model_dir = self.models_dir
         if production:
             return os.path.join(model_dir, 'production')
 
@@ -129,4 +166,3 @@ class Config(TeaConfig, metaclass=SingletonMetaclass):
         if not os.path.isdir(model_dir):
             os.makedirs(model_dir)
         return model_dir
-

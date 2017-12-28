@@ -4,6 +4,8 @@ __copyright__ = 'Copyright (c)  2017 Viktor Kerkez'
 
 import dg
 from dg.utils import bar
+import pandas as pd
+from tea.utils import get_object
 
 
 def train_model(model, train_set, eval_set=None, model_dir=None, save=False,
@@ -20,11 +22,11 @@ def train_model(model, train_set, eval_set=None, model_dir=None, save=False,
     """
     if verbose:
         print('Training:', model)
-    model.train(train_set, eval_set)
+    model.fit_dataset(train_set, eval_set)
     if save:
         if verbose:
             print('Saving:', model)
-        model.save_model(model_dir)
+        model.save(model_dir)
 
 
 def train(models, train_set, eval_set=None, verbose=False):
@@ -43,7 +45,7 @@ def train(models, train_set, eval_set=None, verbose=False):
         print('Model dir: ', model_dir)
     bar(verbose=verbose)
     for name in models:
-        model = config.models[name]()
+        model = config.models[name](**config.get_params(name))
         train_model(
             model, train_set, eval_set, model_dir, save=True, verbose=verbose
         )
@@ -72,15 +74,12 @@ def print_metrics(metrics):
             print(f'\t{key.split("-")[-1]}:\t{metrics[key]:.4f}')
 
 
-def evaluate_model(model, train_set=None, eval_set=None, test_set=None,
-                   verbose=False):
+def evaluate_model(model, metrics_dict, verbose=False):
     """Evaluate a single model
 
     Args:
         model: Model to evaluate
-        train_set (str): Path to the training dataset
-        eval_set (str): Optional path to the evaluation dataset
-        test_set (str): Path to the test dataset
+        metrics_dict (dict): Dictionary of metrics objects
         verbose (bool): Print details
     Returns:
         dict: Evaluation metrics
@@ -88,20 +87,14 @@ def evaluate_model(model, train_set=None, eval_set=None, test_set=None,
     if verbose:
         print('Evaluating:', model)
     metrics = {'model': model.name}
-    if train_set is not None:
-        train_eval = model.evaluate(train_set)
-        for key in train_eval:
-            metrics[f'train-{key}'] = train_eval[key]
-
-    if eval_set is not None:
-        eval_eval = model.evaluate(eval_set)
-        for key in eval_eval:
-            metrics[f'eval-{key}'] = eval_eval[key]
-
-    if test_set is not None:
-        test_eval = model.evaluate(test_set)
-        for key in test_eval:
-            metrics[f'test-{key}'] = test_eval[key]
+    for dataset, metrics_obj in metrics_dict.items():
+        if metrics_obj is None:
+            continue
+        if verbose:
+            print(f'Evaluating {dataset} set')
+        evaluation = metrics_obj.evaluate(model)
+        for key in evaluation:
+            metrics[f'{dataset}-{key}'] = evaluation[key]
     if verbose:
         print_metrics(metrics)
     return metrics
@@ -123,16 +116,18 @@ def evaluate(models, train_set=None, eval_set=None, test_set=None,
     """
     config = dg.Config()
     metrics = []
+    metrics_class = get_object(config['metrics'])
+    metrics_dict = {
+        'train': None if train_set is None else metrics_class(train_set),
+        'eval': None if eval_set is None else metrics_class(eval_set),
+        'test': None if test_set is None else metrics_class(test_set),
+    }
+
     bar(verbose=verbose)
     for name in models:
-        model = config.models[name]()
-        model.load()
-        metrics.append(evaluate_model(
-            model, train_set=train_set, eval_set=eval_set, test_set=test_set,
-            verbose=verbose
-        ))
+        model = config.models[name].load()
+        metrics.append(evaluate_model(model, metrics_dict, verbose=verbose))
         bar(verbose=verbose)
-    import pandas as pd
 
     df = pd.DataFrame(metrics)
     df.insert(0, 'model', df.pop('model'))
@@ -154,16 +149,19 @@ def train_and_evaluate(models, train_set=None, eval_set=None, test_set=None,
     """
     config = dg.Config()
     metrics = []
+    metrics_class = get_object(config['metrics'])
+    metrics_dict = {
+        'train': None if train_set is None else metrics_class(train_set),
+        'eval': None if eval_set is None else metrics_class(eval_set),
+        'test': None if test_set is None else metrics_class(test_set),
+    }
+
     bar(verbose=verbose)
     for name in models:
-        model = config.models[name]()
+        model = config.models[name](**config.get_params(name))
         train_model(model, train_set, eval_set, save=False, verbose=verbose)
-        metrics.append(evaluate_model(
-            model, train_set=train_set, eval_set=eval_set, test_set=test_set,
-            verbose=verbose
-        ))
+        metrics.append(evaluate_model(model, metrics_dict, verbose=verbose))
         bar(verbose=verbose)
-    import pandas as pd
 
     df = pd.DataFrame(metrics)
     df.insert(0, 'model', df.pop('model'))

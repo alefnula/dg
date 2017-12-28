@@ -20,16 +20,17 @@ def retrain(verbose=False):
     """
     # First export the data
     config = dg.Config()
-    export_fn = get_object(config.functions.export)
+    export_fn = get_object(config.functions['export'])
 
     if verbose:
         print('Exporting the data')
-    export_fn(config.datasets.export_set)
+    export_fn(config.datasets['export_set'])
 
     models = list({config['nextflix.nextflix'],
                    config['nextflix.similar_users'],
                    config['nextflix.similar_movies']})
-    train(models=models, dataset=config.datasets.export_set, verbose=verbose)
+    train(models=models, dataset=config.datasets['export_set'],
+          verbose=verbose)
     deploy(models, verbose=verbose)
     # Try to trigger the server to reload models
     if verbose:

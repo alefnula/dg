@@ -19,13 +19,11 @@ class Server(object):
     def __init__(self):
         self.config = dg.Config()
 
+        # Load models
         self.models = {
-            model: self.config.models[model]()
+            model: self.config.models[model].load()
             for model in self.config['server.models']
         }
-        # Load models
-        for model in self.models.values():
-            model.load()
 
         # Create server and setup routes
         self.server = Sanic()
@@ -35,8 +33,8 @@ class Server(object):
     # Reload models
     async def reload(self, request):
         """Reload models"""
-        for model in self.models.values():
-            model.load()
+        for name, model in self.models:
+            self.models[name] = model.load()
         return json({'message': 'OK'})
 
     def run(self):

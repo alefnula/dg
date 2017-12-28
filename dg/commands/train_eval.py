@@ -27,12 +27,12 @@ def train(models=None, production=False, export=False, verbose=True):
     """
     config = dg.Config()
     train_set = (
-        config.datasets.export if export else (
-            config.datasets.full_set if production else
-            config.datasets.train_set
+        config.datasets['export_set'] if export else (
+            config.datasets['full_set'] if production else
+            config.datasets['train_set']
         )
     )
-    eval_set = config.datasets.eval_set
+    eval_set = config.datasets['eval_set']
     models = models or config.models.keys()
     train_eval.train(models, train_set, eval_set, verbose=verbose)
 
@@ -60,9 +60,9 @@ def evaluate(models=None, test_only=False, output=None, verbose=False):
     models = models or config.models.keys()
     df = train_eval.evaluate(
         models,
-        train_set=None if test_only else config.datasets.train_set,
-        eval_set=config.datasets.eval_set,
-        test_set=config.datasets.test_set,
+        train_set=None if test_only else config.datasets['train_set'],
+        eval_set=config.datasets['eval_set'],
+        test_set=config.datasets['test_set'],
         verbose=verbose)
     print_and_save_df(df, output=output)
 
@@ -89,8 +89,8 @@ def train_and_evaluate(models=None, test_only=False, output=None,
     models = models or config.models.keys()
     df = train_eval.train_and_evaluate(
         models,
-        train_set=None if test_only else config.datasets.train_set,
-        eval_set=config.datasets.eval_set,
-        test_set=config.datasets.test_set,
+        train_set=None if test_only else config.datasets['train_set'],
+        eval_set=config.datasets['eval_set'],
+        test_set=config.datasets['test_set'],
         verbose=verbose)
     print_and_save_df(df, output=output)

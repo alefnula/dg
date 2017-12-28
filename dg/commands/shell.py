@@ -6,11 +6,11 @@ import dg
 
 
 @dg.command
-def shell(user_ns=None):
+def shell():
     """Run IPython shell with loaded configuration and model classes
     """
     from IPython import embed
-    user_ns = user_ns or {}
+    user_ns = {}
 
     config = dg.Config()
     user_ns['config'] = config
