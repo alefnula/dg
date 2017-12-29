@@ -15,7 +15,7 @@ from sklearn.base import (
 )
 
 
-class Model(BaseEstimator):
+class Model(BaseEstimator, TransformerMixin):
     """Base class for all estimators
 
         Attributes:
@@ -46,7 +46,7 @@ class Model(BaseEstimator):
             Estimator: Returns self.
         """
 
-    def fit_dataset(self, train_set, eval_set=None, targets=None):
+    def fit_dataset(self, train_set, eval_set=None):
         """Default implementation of the fit dataset function.
 
         This function receives a path to the train_set and potentially eval_set
@@ -55,19 +55,16 @@ class Model(BaseEstimator):
         Args:
             train_set (str): Path to the csv training dataset
             eval_set (str): Path to the csv evaluation set
-            targets: (list of str): List of target columns
 
         Returns:
             Estimator: Returns self.
         """
         train_set = pd.read_csv(train_set)
-        if targets is not None:
-            features = feature_cols(train_set.columns, targets)
-            X = train_set[features]
-            y = train_set[targets]
-        else:
-            X = train_set
+        X = train_set[self.config.features]
+        if self.config.targets in (None, [], tuple()):
             y = None
+        else:
+            y = train_set[self.config.targets]
         return self.fit(X, y)
 
     @abc.abstractmethod
@@ -85,7 +82,7 @@ class Model(BaseEstimator):
                 in regression).
         """
 
-    def predict_dataset(self, dataset, targets=None):
+    def predict_dataset(self, dataset):
         """Default implementation of the predict dataset function.
 
         This function receives a path to the dataset and target labels, reads
@@ -93,58 +90,10 @@ class Model(BaseEstimator):
 
         Args:
             dataset (str): Path to the dataset csv
-            targets (list of str): List of target columns
         """
         dataset = pd.read_csv(dataset)
-        if targets is not None:
-            features = feature_cols(dataset.columns, targets)
-            X = dataset[features]
-        else:
-            X = dataset
+        X = dataset[self.config.features]
         return self.predict(X)
-
-    def save(self, model_dir):
-        """Save the model
-
-        Args:
-            model_dir (str): Path to the directory where the model should be
-                saved.
-        """
-        model_dir = os.path.join(model_dir, self.name)
-        ensure_dir(model_dir, directory=True)
-        pickle_file = os.path.join(model_dir, f'{self.name}.pickle')
-        with io.open(pickle_file, 'wb') as f:
-            pickle.dump(self, f)
-
-    @classmethod
-    def load(cls, model_dir=None):
-        """Load the model
-
-        Args:
-            model_dir (str): If `model_dir` is provided, loads the model from
-                the model dir, else loads the production model.
-        Returns:
-            Estimator: Returns the estimator loaded from the save point
-        """
-        model_dir = model_dir or Config().get_model_dir(production=True)
-        pickle_file = os.path.join(model_dir, cls.name, f'{cls.name}.pickle')
-
-        with io.open(pickle_file, 'rb') as f:
-            return pickle.load(f)
-
-
-class Classifier(Model, ClassifierMixin, metaclass=abc.ABCMeta):
-    """Base class for all classifiers"""
-    pass
-
-
-class Regressor(Model, RegressorMixin, metaclass=abc.ABCMeta):
-    """Base class for all regressors"""
-    pass
-
-
-class Transformer(Model, TransformerMixin, metaclass=abc.ABCMeta):
-    """Base class for all transformers"""
 
     @abc.abstractmethod
     def transform(self, X):
@@ -158,6 +107,105 @@ class Transformer(Model, TransformerMixin, metaclass=abc.ABCMeta):
             array of int of shape = [n_samples, n_features]: The transofrmed
                 array.
         """
+
+    def transform_dataset(self, dataset):
+        """Default implementation of the tranform dataset function.
+
+        This function receives a path to the dataset and target labels, reads
+        the files from disk and transforms it.
+
+        Args:
+            dataset (str): Path to the dataset csv
+        """
+        dataset = pd.read_csv(dataset)
+        X = dataset[self.config.features]
+        return self.predict(X)
+
+    def save(self, model_dir):
+        """Save the model
+
+        Args:
+            model_dir (str): Path to the directory where the model should be
+                saved.
+        """
+        model_dir = os.path.join(model_dir, self.name)
+        ensure_dir(model_dir, directory=True)
+
+        model_file = os.path.join(model_dir, f'{self.name}.pickle')
+        with io.open(model_file, 'wb') as f:
+            pickle.dump(self, f)
+
+        params_file = os.path.join(model_dir, 'params.pickle')
+        with io.open(params_file, 'wb') as f:
+            pickle.dump(self.get_params(), f)
+
+    @classmethod
+    def load(cls, model_dir=None):
+        """Load the model
+
+        Args:
+            model_dir (str): If `model_dir` is provided, loads the model from
+                the model dir, else loads the production model.
+        Returns:
+            Estimator: Returns the estimator loaded from the save point
+        """
+        model_dir = model_dir or Config().get_model_dir(production=True)
+
+        model_file = os.path.join(model_dir, cls.name, f'{cls.name}.pickle')
+        with io.open(model_file, 'rb') as f:
+            model = pickle.load(f)
+
+        params_file = os.path.join(model_dir, cls.name, 'params.pickle')
+        with io.open(params_file, 'rb') as f:
+            model.set_params(**pickle.load(f))
+        return model
+
+
+class Classifier(Model, ClassifierMixin, metaclass=abc.ABCMeta):
+    """Base class for all classifiers"""
+    pass
+
+
+class Regressor(Model, RegressorMixin, metaclass=abc.ABCMeta):
+    """Base class for all regressors"""
+    pass
+
+
+# def wrap_sklearn(estimator):
+#     """Wraps sklearn objects to conform to dg.Model classes
+#
+#     Args:
+#         estimator (sklearn.base.BaseEstimator): Sklearn estimator we want to
+#             wrap and make it conform to the dg.Model
+#     """
+#     if isinstance(estimator, type):
+#         estimator.fit_dataset = Model.fit_dataset
+#         estimator.predict_dataset = Model.predict_dataset
+#         estimator.save = Model.save
+#         estimator.load = partial(Model.load.__func__, estimator)
+#     else:
+#         estimator.fit_dataset = types.MethodType(
+#             Model.fit_dataset, estimator)
+#         estimator.predict_dataset = types.MethodType(
+#             Model.predict_dataset, estimator)
+#         estimator.save = types.ModuleType(Model.save, estimator)
+#         estimator.load = partial(Model.load.__func__, estimator.__class__)
+#     return estimator
+
+
+class SklearnModel(Model):
+    def __init__(self):
+        super().__init__()
+        self.model = None  # Implement sklearn model
+
+    def fit(self, X, y=None):
+        return self.model.fit(X, y)
+
+    def predict(self, X):
+        return self.model.predict(X)
+
+    def transform(self, X):
+        return self.model.transform(X)
 
 
 class TensorflowModel(Model, metaclass=abc.ABCMeta):

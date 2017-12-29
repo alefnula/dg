@@ -30,6 +30,9 @@ dg
 '''
 
 CONFIG = '''\
+features: []
+targets: []
+
 models: {{}}
 
 grid: {{}}

@@ -10,7 +10,6 @@ from datetime import datetime
 from collections import OrderedDict
 from dg.exceptions import ConfigNotFound
 from tea.utils import get_object
-from tea.dsa.dicts import DictObject
 from tea.dsa.singleton import Singleton
 
 
@@ -19,6 +18,12 @@ class Config(Singleton):
 
     Attributes:
         data_dir (str): Path to the data directory
+        model_dir (str): Path to the model directory
+        features (list of str): List of feature columns in the dataset
+        targets (list of str): List of target columns in the dataset
+        meta (dict): Metadata about the dataset
+        datasets (dict): Dictionary of datasets
+        functions (dict): Dictionary of functions
     """
     def __init__(self, path=None):
         """
@@ -51,8 +56,17 @@ class Config(Singleton):
         with io.open(config_file, 'r', encoding='utf-8') as f:
             self.data = yaml.safe_load(f)
 
-        self.__models = None
+        # Setup features and targets
+        features = self.data['features']
+        if len(features) == 1:
+            features = features[0]
+        self.features = features
+        targets = self.data['targets']
+        if len(targets) == 1:
+            targets = targets[0]
+        self.targets = targets
 
+        self.__models = None
         # Load the meta file
         meta_file = os.path.join(self.data_dir, self['datasets.meta'])
         if os.path.isfile(meta_file):

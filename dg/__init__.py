@@ -3,11 +3,13 @@ __date__ = ' 16 December 2017'
 __copyright__ = 'Copyright (c) 2017 Viktor Kerkez'
 
 __all__ = [
-    'Model', 'Classifier', 'Regressor', 'Transformer', 'TensorflowModel',
+    'Model', 'Classifier', 'Regressor', 'SklearnModel', 'TensorflowModel',
     'Config', 'Server', 'command', 'argument'
 ]
 
-from dg.model import Model, Classifier, Regressor, Transformer, TensorflowModel
+from dg.model import (
+    Model, Classifier, Regressor, SklearnModel, TensorflowModel
+)
 from dg.config import Config
 from dg.server import Server
 from dg.command import command, argument
