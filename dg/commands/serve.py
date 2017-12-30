@@ -11,7 +11,7 @@ def serve():
     """Serve models"""
     config = dg.Config()
 
-    server_klass = config.get('server.klass', None)
+    server_klass = config.get('server.class', None)
     if server_klass:
         server = get_object(server_klass)()
     else:

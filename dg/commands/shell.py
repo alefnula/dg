@@ -13,9 +13,9 @@ def shell():
     user_ns = {}
 
     config = dg.Config()
-    user_ns['config'] = config
-    user_ns.update({
-        model.__name__: model
-        for model in config.models.values()
-    })
+    models = {model.id: model for model in config.models.values()}
+    user_ns = {
+        'config': config,
+        'models': models
+    }
     embed(user_ns=user_ns)

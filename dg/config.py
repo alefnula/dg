@@ -9,7 +9,7 @@ import subprocess
 from datetime import datetime
 from collections import OrderedDict
 from dg.exceptions import ConfigNotFound
-from tea.utils import get_object
+from tea.utils import get_object, Loader
 from tea.dsa.singleton import Singleton
 
 
@@ -17,8 +17,10 @@ class Config(Singleton):
     """Configuration class
 
     Attributes:
+        project_dir (str): Path to the project root directory
+        project_name (str): Name of the project
         data_dir (str): Path to the data directory
-        model_dir (str): Path to the model directory
+        models_dir (str): Path to the models directory
         features (list of str): List of feature columns in the dataset
         targets (list of str): List of target columns in the dataset
         meta (dict): Metadata about the dataset
@@ -54,14 +56,14 @@ class Config(Singleton):
         self.models_dir = os.path.join(self.project_dir, 'models')
 
         with io.open(config_file, 'r', encoding='utf-8') as f:
-            self.data = yaml.safe_load(f)
+            self._data = yaml.safe_load(f)
 
         # Setup features and targets
-        features = self.data['features']
+        features = self._data['features']
         if len(features) == 1:
             features = features[0]
         self.features = features
-        targets = self.data['targets']
+        targets = self._data['targets']
         if len(targets) == 1:
             targets = targets[0]
         self.targets = targets
@@ -88,7 +90,7 @@ class Config(Singleton):
         self.functions = self.get('functions', {})
 
     def __get(self, var):
-        current = self.data
+        current = self._data
         for part in var.split('.'):
             if isinstance(current, dict):
                 current = current[part]
@@ -119,7 +121,7 @@ class Config(Singleton):
         Returns:
             dict: Dictionary of parameters
         """
-        return self[f'models.{name}']
+        return self.get(f'models.{name}', {})
 
     @property
     def models(self):
@@ -129,21 +131,36 @@ class Config(Singleton):
             dict: {model_name: model_class}
         """
         if self.__models is None:
-            from dg.model import Model
-            module = get_object(f'{self.project_name}.models')
-            models = {
-                obj.__name__: obj
-                for obj in get_object(f'{self.project_name}.models.*')
-                if isinstance(obj, type) and issubclass(obj, Model)
-            }
-            if hasattr(module, '__all__'):
-                order = getattr(module, '__all__')
-            else:
-                order = sorted(models.keys())
+            from dg.model import Model, conform_sklearn_to_model
+            from sklearn.base import BaseEstimator
+
+            loader = Loader()
+            loader.load(f'{self.project_name}.models')
+            models_dict = {}
+            for module in loader.modules.values():
+                # First get all non hidden objects
+                if hasattr(module, '__all__'):
+                    estimators = module.__all__
+                else:
+                    estimators = [name for name in dir(module)
+                                  if not name.startswith('_')]
+                # Then filter object by it's type and construct the models
+                # dictionary
+                for estimator in estimators:
+                    obj = getattr(module, estimator)
+                    if isinstance(obj, Model):
+                        models_dict[obj.id] = obj
+                    elif isinstance(obj, BaseEstimator):
+                        model_id = getattr(obj, 'id', estimator)
+                        models_dict[model_id] = conform_sklearn_to_model(
+                            model_id, obj
+                        )
+                    elif isinstance(obj, type) and issubclass(obj, Model):
+                        models_dict[obj.id] = obj()
+
             self.__models = OrderedDict([
-                (model.name, model) for model in [
-                    models[klass_name] for klass_name in order
-                ]
+                (model_id, models_dict[model_id])
+                for model_id in sorted(models_dict.keys())
             ])
         return self.__models
 

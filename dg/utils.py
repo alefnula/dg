@@ -47,20 +47,3 @@ def bar(n=79, verbose=True):
     """
     if verbose:
         print('\n' + '-' * n + '\n')
-
-
-def feature_cols(cols, target_cols):
-    """Remove target columns from columns and leave feature columns in the
-    same order as they were.
-
-    Args:
-        cols (list, pandas.Series): All columns
-        target_cols: (list): Target columns
-    Returns:
-        list: Feature columns
-    """
-    cols = list(cols)
-    for tc in target_cols:
-        if tc in cols:
-            cols.remove(tc)
-    return cols

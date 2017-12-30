@@ -3,6 +3,7 @@ __date__ = ' 17 December 2017'
 __copyright__ = 'Copyright (c)  2017 Viktor Kerkez'
 
 import dg
+from dg import persistence
 from sanic import Sanic
 from sanic.response import json
 
@@ -21,7 +22,7 @@ class Server(object):
 
         # Load models
         self.models = {
-            model: self.config.models[model].load()
+            model: persistence.load(self.config.models[model])
             for model in self.config['server.models']
         }
 
@@ -34,7 +35,7 @@ class Server(object):
     async def reload(self, request):
         """Reload models"""
         for name, model in self.models:
-            self.models[name] = model.load()
+            self.models[name] = persistence.load(model)
         return json({'message': 'OK'})
 
     def run(self):

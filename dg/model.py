@@ -5,14 +5,13 @@ __copyright__ = 'Copyright (c) 2017 Viktor Kerkez'
 import os
 import io
 import abc
-import pickle
+import yaml
+import types
 import pandas as pd
 from tea import shell
+from tea.utils import get_object
 from dg.config import Config
-from dg.utils import ensure_dir, feature_cols
-from sklearn.base import (
-    BaseEstimator, ClassifierMixin, RegressorMixin, TransformerMixin
-)
+from sklearn.base import BaseEstimator, TransformerMixin
 
 
 class Model(BaseEstimator, TransformerMixin):
@@ -22,14 +21,16 @@ class Model(BaseEstimator, TransformerMixin):
             config (Config): Configuration instance
         """
 
-    name = None
-    'Estimator name'
+    id = None
+    'Estimator id'
+
+    _estimator_type = None
 
     def __init__(self):
         self.config = Config()
 
     def __str__(self):
-        return self.name
+        return self.id
 
     @abc.abstractmethod
     def fit(self, X, y=None):
@@ -121,91 +122,100 @@ class Model(BaseEstimator, TransformerMixin):
         X = dataset[self.config.features]
         return self.predict(X)
 
-    def save(self, model_dir):
-        """Save the model
+    def score(self, X, y, sample_weight=None):
+        """Scores the model.
+
+        If scoring function is defined in the configuration file, this function
+        will use that scoring function, else:
+
+        For classification:
+
+        Returns the mean accuracy on the given test data
+        and labels.
+
+        In multi-label classification, this is the subset accuracy
+        which is a harsh metric since you require for each sample that
+        each label set be correctly predicted.
+
+
+        For regression:
+
+        Returns the coefficient of determination R^2 of the prediction.
+
+        The coefficient R^2 is defined as (1 - u/v), where u is the residual
+        sum of squares ((y_true - y_pred) ** 2).sum() and v is the total
+        sum of squares ((y_true - y_true.mean()) ** 2).sum().
+        The best possible score is 1.0 and it can be negative (because the
+        model can be arbitrarily worse). A constant model that always
+        predicts the expected value of y, disregarding the input features,
+        would get a R^2 score of 0.0.
 
         Args:
-            model_dir (str): Path to the directory where the model should be
-                saved.
-        """
-        model_dir = os.path.join(model_dir, self.name)
-        ensure_dir(model_dir, directory=True)
+            X (array-like, shape = (n_samples, n_features)): Test samples.
+            y (array-like, shape = (n_samples) or (n_samples, n_outputs)):
+                True labels for X.
+            sample_weight (array-like, shape = [n_samples], optional):
+                Sample weights.
 
-        model_file = os.path.join(model_dir, f'{self.name}.pickle')
-        with io.open(model_file, 'wb') as f:
-            pickle.dump(self, f)
-
-        params_file = os.path.join(model_dir, 'params.pickle')
-        with io.open(params_file, 'wb') as f:
-            pickle.dump(self.get_params(), f)
-
-    @classmethod
-    def load(cls, model_dir=None):
-        """Load the model
-
-        Args:
-            model_dir (str): If `model_dir` is provided, loads the model from
-                the model dir, else loads the production model.
         Returns:
-            Estimator: Returns the estimator loaded from the save point
+            float: For classification: mean accuracy of self.predict(X) wrt. y.
+                   For regression: R^2 of self.predict(X) wrt. y.
         """
-        model_dir = model_dir or Config().get_model_dir(production=True)
+        score = self.config.get('metrics.score', None)
+        if score is not None:
+            score = get_object(score)
+            return score(y, self.predict(X), sample_weight=sample_weight)
+        else:
+            if self._estimator_type == 'classifier':
+                from sklearn.metrics import accuracy_score
+                return accuracy_score(y, self.predict(X),
+                                      sample_weight=sample_weight)
+            elif self._estimator_type == 'regressor':
+                from sklearn.metrics import r2_score
+                return r2_score(y, self.predict(X),
+                                sample_weight=sample_weight,
+                                multioutput='variance_weighted')
+            else:
+                # Don't know how to score the model, just return 0
+                return 0
 
-        model_file = os.path.join(model_dir, cls.name, f'{cls.name}.pickle')
-        with io.open(model_file, 'rb') as f:
-            model = pickle.load(f)
 
-        params_file = os.path.join(model_dir, cls.name, 'params.pickle')
-        with io.open(params_file, 'rb') as f:
-            model.set_params(**pickle.load(f))
-        return model
-
-
-class Classifier(Model, ClassifierMixin, metaclass=abc.ABCMeta):
+class Classifier(Model, metaclass=abc.ABCMeta):
     """Base class for all classifiers"""
-    pass
+
+    _estimator_type = 'classifier'
 
 
-class Regressor(Model, RegressorMixin, metaclass=abc.ABCMeta):
+class Regressor(Model, metaclass=abc.ABCMeta):
     """Base class for all regressors"""
-    pass
+
+    _estimator_type = 'regressor'
 
 
-# def wrap_sklearn(estimator):
-#     """Wraps sklearn objects to conform to dg.Model classes
-#
-#     Args:
-#         estimator (sklearn.base.BaseEstimator): Sklearn estimator we want to
-#             wrap and make it conform to the dg.Model
-#     """
-#     if isinstance(estimator, type):
-#         estimator.fit_dataset = Model.fit_dataset
-#         estimator.predict_dataset = Model.predict_dataset
-#         estimator.save = Model.save
-#         estimator.load = partial(Model.load.__func__, estimator)
-#     else:
-#         estimator.fit_dataset = types.MethodType(
-#             Model.fit_dataset, estimator)
-#         estimator.predict_dataset = types.MethodType(
-#             Model.predict_dataset, estimator)
-#         estimator.save = types.ModuleType(Model.save, estimator)
-#         estimator.load = partial(Model.load.__func__, estimator.__class__)
-#     return estimator
+def conform_sklearn_to_model(id, obj):
+    """If the object is one of the scikit learn estimators, we add methods
+    needed to work with the data.
+    """
+    obj.id = id
+    obj.config = Config()
+    obj.__str__ = types.MethodType(Model.__str__, obj)
+    obj.fit_dataset = types.MethodType(Model.fit_dataset, obj)
+    obj.predict_dataset = types.MethodType(Model.predict_dataset, obj)
+    obj.transform_dataset = types.MethodType(Model.transform_dataset, obj)
+    obj.score = types.MethodType(Model.score, obj)
+    if not hasattr(obj, '_estimator_type'):
+        obj._estimator_type = None
+    return obj
 
 
-class SklearnModel(Model):
-    def __init__(self):
-        super().__init__()
-        self.model = None  # Implement sklearn model
-
-    def fit(self, X, y=None):
-        return self.model.fit(X, y)
-
-    def predict(self, X):
-        return self.model.predict(X)
-
-    def transform(self, X):
-        return self.model.transform(X)
+def strip_model_function(obj):
+    del obj.config
+    del obj.__str__
+    del obj.fit_dataset
+    del obj.predict_dataset
+    del obj.transform_dataset
+    del obj.score
+    return obj
 
 
 class TensorflowModel(Model, metaclass=abc.ABCMeta):
@@ -282,19 +292,28 @@ class TensorflowModel(Model, metaclass=abc.ABCMeta):
         return np.array(list(predictions))
 
     def save(self, model_dir):
-        model_dir = os.path.join(model_dir, self.name)
-        ensure_dir(model_dir, directory=True)
+        """Saves the tensorflow model.
+
+        Args:
+            model_dir (str): Path to the directory where the model should be
+                saved.
+        """
         shell.gcopy(os.path.join(self.model_dir, '*'), f'{model_dir}/')
+        with io.open(os.path.join(model_dir, 'params.yaml')) as f:
+            yaml.safe_dump(self.get_params(), f)
 
     @classmethod
-    def load(cls, model_dir=None):
-        """Load the production model"""
+    def load(cls, model_dir):
+        """Load the production model
+
+        Args:
+            model_dir (str): Path to the model dir from where we should load
+                the model.
+        """
         config = Config()
-        save_dir = os.path.join(
-            config.get_model_dir(production=True), cls.name
-        ) if model_dir is None else os.path.join(model_dir, cls.name)
-        params = config.get_params(cls.name)
+        with io.open(os.path.join(model_dir, 'params.yaml')) as f:
+            params = yaml.safe_load(f)
         model = cls(**params)
         model.model_dir = config.get_model_dir(tensorflow=True)
-        model.estimator = model._create_estimator(save_dir)
+        model.estimator = model._create_estimator(model_dir)
         return model

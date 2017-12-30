@@ -33,6 +33,15 @@ CONFIG = '''\
 features: []
 targets: []
 
+metrics:
+    score: sklearn.metrics.accuracy_score
+    class: dg.metrics.Metrics
+    all:
+        - name: accuracy
+          func: sklearn.metrics.accuracy_score
+        - name: log_loss
+          func: sklearn.metrics.log_loss 
+
 models: {{}}
 
 grid: {{}}
@@ -49,7 +58,7 @@ functions:
   export: {project_name}.export.export
 
 server:
-  klass: {project_name}.server.Server
+  class: {project_name}.server.Server
   host: 127.0.0.1
   port: 8001
   params: {{}}

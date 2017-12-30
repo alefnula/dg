@@ -4,8 +4,10 @@ __copyright__ = 'Copyright (c)  2017 Viktor Kerkez'
 
 import dg
 from dg.utils import bar
+from dg import persistence
 import pandas as pd
 from tea.utils import get_object
+from collections import OrderedDict
 
 
 def train_model(model, train_set, eval_set=None, model_dir=None, save=False,
@@ -26,7 +28,7 @@ def train_model(model, train_set, eval_set=None, model_dir=None, save=False,
     if save:
         if verbose:
             print('Saving:', model)
-        model.save(model_dir)
+        persistence.save(model, model_dir)
 
 
 def train(models, train_set, eval_set=None, verbose=False):
@@ -44,8 +46,10 @@ def train(models, train_set, eval_set=None, verbose=False):
     if verbose:
         print('Model dir: ', model_dir)
     bar(verbose=verbose)
-    for name in models:
-        model = config.models[name](**config.get_params(name))
+    for model_id in models:
+        model = config.models[model_id].set_params(
+            **config.get_params(model_id)
+        )
         train_model(
             model, train_set, eval_set, model_dir, save=True, verbose=verbose
         )
@@ -86,15 +90,21 @@ def evaluate_model(model, metrics_dict, verbose=False):
     """
     if verbose:
         print('Evaluating:', model)
-    metrics = {'model': model.name}
+    all_metrics = []
     for dataset, metrics_obj in metrics_dict.items():
         if metrics_obj is None:
             continue
         if verbose:
             print(f'Evaluating {dataset} set')
+        metrics = []
         evaluation = metrics_obj.evaluate(model)
         for key in evaluation:
-            metrics[f'{dataset}-{key}'] = evaluation[key]
+            metrics.append((f'{dataset}-{key}', evaluation[key]))
+        all_metrics.append(metrics)
+    metrics = OrderedDict(
+        [('model', model.id)] +
+        [item for sublist in zip(*all_metrics) for item in sublist]
+    )
     if verbose:
         print_metrics(metrics)
     return metrics
@@ -116,7 +126,7 @@ def evaluate(models, train_set=None, eval_set=None, test_set=None,
     """
     config = dg.Config()
     metrics = []
-    metrics_class = get_object(config['metrics'])
+    metrics_class = get_object(config['metrics.class'])
     metrics_dict = {
         'train': None if train_set is None else metrics_class(train_set),
         'eval': None if eval_set is None else metrics_class(eval_set),
@@ -125,7 +135,7 @@ def evaluate(models, train_set=None, eval_set=None, test_set=None,
 
     bar(verbose=verbose)
     for name in models:
-        model = config.models[name].load()
+        model = persistence.load(config.models[name])
         metrics.append(evaluate_model(model, metrics_dict, verbose=verbose))
         bar(verbose=verbose)
 
@@ -149,7 +159,7 @@ def train_and_evaluate(models, train_set=None, eval_set=None, test_set=None,
     """
     config = dg.Config()
     metrics = []
-    metrics_class = get_object(config['metrics'])
+    metrics_class = get_object(config['metrics.class'])
     metrics_dict = {
         'train': None if train_set is None else metrics_class(train_set),
         'eval': None if eval_set is None else metrics_class(eval_set),
@@ -157,8 +167,10 @@ def train_and_evaluate(models, train_set=None, eval_set=None, test_set=None,
     }
 
     bar(verbose=verbose)
-    for name in models:
-        model = config.models[name](**config.get_params(name))
+    for model_id in models:
+        model = config.models[model_id].set_params(
+            **config.get_params(model_id)
+        )
         train_model(model, train_set, eval_set, save=False, verbose=verbose)
         metrics.append(evaluate_model(model, metrics_dict, verbose=verbose))
         bar(verbose=verbose)
