@@ -21,6 +21,7 @@ class Config(Singleton):
         project_name (str): Name of the project
         data_dir (str): Path to the data directory
         models_dir (str): Path to the models directory
+        metrics_db (str): Path to the metrics database
         features (list of str): List of feature columns in the dataset
         targets (list of str): List of target columns in the dataset
         meta (dict): Metadata about the dataset
@@ -54,6 +55,9 @@ class Config(Singleton):
         # Get the data dir
         self.data_dir = os.path.join(self.project_dir, 'data')
         self.models_dir = os.path.join(self.project_dir, 'models')
+
+        # Metrics database
+        self.metrics_db = os.path.join(self.models_dir, 'metrics.db')
 
         with io.open(config_file, 'r', encoding='utf-8') as f:
             self._data = yaml.safe_load(f)

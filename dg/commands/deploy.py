@@ -31,7 +31,9 @@ def deploy(models=None, verbose=False):
         os.path.basename(x) for x in
         glob.glob(os.path.join(models_dir, '*'))
         # Remove production and tensorflow from the list
-        if os.path.basename(x) not in ('production', 'tensorflow')
+        if os.path.basename(x) not in (
+            'production', 'tensorflow', 'metrics.db'
+        )
     ]
 
     latest = os.path.join(models_dir, sorted(

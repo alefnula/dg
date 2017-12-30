@@ -10,7 +10,6 @@ def shell():
     """Run IPython shell with loaded configuration and model classes
     """
     from IPython import embed
-    user_ns = {}
 
     config = dg.Config()
     models = {model.id: model for model in config.models.values()}

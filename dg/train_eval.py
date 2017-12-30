@@ -5,9 +5,9 @@ __copyright__ = 'Copyright (c)  2017 Viktor Kerkez'
 import dg
 from dg.utils import bar
 from dg import persistence
+from dg.metrics import Metrics
 import pandas as pd
 from tea.utils import get_object
-from collections import OrderedDict
 
 
 def train_model(model, train_set, eval_set=None, model_dir=None, save=False,
@@ -23,11 +23,11 @@ def train_model(model, train_set, eval_set=None, model_dir=None, save=False,
         verbose (bool): Print details
     """
     if verbose:
-        print('Training:', model)
+        print('Training:', model.id)
     model.fit_dataset(train_set, eval_set)
     if save:
         if verbose:
-            print('Saving:', model)
+            print('Saving:', model.id)
         persistence.save(model, model_dir)
 
 
@@ -58,56 +58,58 @@ def train(models, train_set, eval_set=None, verbose=False):
 
 def print_metrics(metrics):
     """Pretty print the metrics"""
-    train_keys = sorted([key for key in metrics if key.startswith('train-')])
-    eval_keys = sorted([key for key in metrics if key.startswith('eval-')])
-    test_keys = sorted([key for key in metrics if key.startswith('test-')])
-
-    if train_keys:
+    if metrics[Metrics.TRAIN]:
         print('Train:')
-        for key in train_keys:
-            print(f'\t{key.split("-")[-1]}:\t{metrics[key]:.4f}')
+        for key, value in metrics[Metrics.TRAIN].items():
+            print(f'\t{key}:\t{value:.4f}')
 
-    if eval_keys:
+    if metrics[Metrics.EVAL]:
         print('Eval:')
-        for key in eval_keys:
-            print(f'\t{key.split("-")[-1]}:\t{metrics[key]:.4f}')
+        for key, value in metrics[Metrics.EVAL].items():
+            print(f'\t{key}:\t{value:.4f}')
 
-    if test_keys:
+    if metrics[Metrics.TEST]:
         print('Test:')
-        for key in test_keys:
-            print(f'\t{key.split("-")[-1]}:\t{metrics[key]:.4f}')
+        for key, value in metrics[Metrics.TEST].items():
+            print(f'\t{key}:\t{value:.4f}')
 
 
-def evaluate_model(model, metrics_dict, verbose=False):
+def metrics_to_dict(model, metrics):
+    d = {'model': model.id}
+    for ds in metrics:
+        if metrics[ds] is not None:
+            for metric in metrics[ds]:
+                d[f'{ds}-{metric}'] = metrics[ds][metric]
+    return d
+
+
+def evaluate_model(model, metrics, verbose=False):
     """Evaluate a single model
 
     Args:
         model: Model to evaluate
-        metrics_dict (dict): Dictionary of metrics objects
+        metrics (dg.metrics.Metrics): Dictionary of metrics objects
         verbose (bool): Print details
     Returns:
         dict: Evaluation metrics
     """
     if verbose:
-        print('Evaluating:', model)
-    all_metrics = []
-    for dataset, metrics_obj in metrics_dict.items():
-        if metrics_obj is None:
-            continue
-        if verbose:
-            print(f'Evaluating {dataset} set')
-        metrics = []
-        evaluation = metrics_obj.evaluate(model)
-        for key in evaluation:
-            metrics.append((f'{dataset}-{key}', evaluation[key]))
-        all_metrics.append(metrics)
-    metrics = OrderedDict(
-        [('model', model.id)] +
-        [item for sublist in zip(*all_metrics) for item in sublist]
-    )
+        print('Evaluating:', model.id)
+    db = persistence.Database()
+    old_metrics = db.get(model)
+    datasets = [ds for ds in metrics.ALL if old_metrics[ds] is None]
+    new_metrics = metrics.evaluate(model, datasets=datasets)
+    merged_metrics = {}
+    for ds in metrics.ALL:
+        if old_metrics[ds] is not None:
+            merged_metrics[ds] = old_metrics[ds]
+        else:
+            merged_metrics[ds] = new_metrics[ds]
+    if old_metrics != merged_metrics:
+        db.add(model, merged_metrics)
     if verbose:
-        print_metrics(metrics)
-    return metrics
+        print_metrics(merged_metrics)
+    return metrics_to_dict(model, merged_metrics)
 
 
 def evaluate(models, train_set=None, eval_set=None, test_set=None,
@@ -125,22 +127,17 @@ def evaluate(models, train_set=None, eval_set=None, test_set=None,
         verbose (bool): Print details
     """
     config = dg.Config()
-    metrics = []
     metrics_class = get_object(config['metrics.class'])
-    metrics_dict = {
-        'train': None if train_set is None else metrics_class(train_set),
-        'eval': None if eval_set is None else metrics_class(eval_set),
-        'test': None if test_set is None else metrics_class(test_set),
-    }
+    metrics = metrics_class(train_set, eval_set, test_set)
 
+    all_metrics = []
     bar(verbose=verbose)
     for name in models:
         model = persistence.load(config.models[name])
-        metrics.append(evaluate_model(model, metrics_dict, verbose=verbose))
+        all_metrics.append(evaluate_model(model, metrics, verbose=verbose))
         bar(verbose=verbose)
 
-    df = pd.DataFrame(metrics)
-    df.insert(0, 'model', df.pop('model'))
+    df = pd.DataFrame(all_metrics, columns=['model'] + metrics.columns())
     return df
 
 
@@ -158,23 +155,17 @@ def train_and_evaluate(models, train_set=None, eval_set=None, test_set=None,
 
     """
     config = dg.Config()
-    metrics = []
     metrics_class = get_object(config['metrics.class'])
-    metrics_dict = {
-        'train': None if train_set is None else metrics_class(train_set),
-        'eval': None if eval_set is None else metrics_class(eval_set),
-        'test': None if test_set is None else metrics_class(test_set),
-    }
-
+    metrics = metrics_class(train_set, eval_set, test_set)
+    all_metrics = []
     bar(verbose=verbose)
     for model_id in models:
         model = config.models[model_id].set_params(
             **config.get_params(model_id)
         )
         train_model(model, train_set, eval_set, save=False, verbose=verbose)
-        metrics.append(evaluate_model(model, metrics_dict, verbose=verbose))
+        all_metrics.append(evaluate_model(model, metrics, verbose=verbose))
         bar(verbose=verbose)
 
-    df = pd.DataFrame(metrics)
-    df.insert(0, 'model', df.pop('model'))
+    df = pd.DataFrame(all_metrics, columns=['model'] + metrics.columns())
     return df

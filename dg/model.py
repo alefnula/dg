@@ -264,6 +264,19 @@ class TensorflowModel(Model, metaclass=abc.ABCMeta):
             model_fn=self.model_fn, config=config, params=tf_params
         )
 
+    def fit(self, X, y=None):
+        import tensorflow as tf
+        input_fn = tf.estimator.inputs.pandas_input_fn(
+            x=X, y=y, shuffle=False, num_epochs=1
+        )
+        self.model_dir = self.config.get_model_dir(tensorflow=True)
+        self.estimator = self._create_estimator(self.model_dir)
+        experiment = tf.contrib.learn.Experiment(
+            estimator=self.estimator,
+            train_input_fn=input_fn
+        )
+        experiment.fit()
+
     def fit_dataset(self, train_set, eval_set=None, targets=None):
         import tensorflow as tf
 
@@ -288,6 +301,14 @@ class TensorflowModel(Model, metaclass=abc.ABCMeta):
             input_fn=tf.estimator.inputs.pandas_input_fn(
                 x=features, shuffle=False, num_epochs=1
             )
+        )
+        return np.array(list(predictions))
+
+    def predict_dataset(self, dataset):
+        import numpy as np
+
+        predictions = self.estimator.predict(
+            input_fn=self.input_fn(dataset)
         )
         return np.array(list(predictions))
 
