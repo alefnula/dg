@@ -10,7 +10,6 @@ import hashlib
 import sqlite3
 import numpy as np
 from dg.utils import ensure_dir
-from dg.model import Model, conform_sklearn_to_model, strip_model_function
 from sklearn.externals import joblib
 
 
@@ -29,14 +28,7 @@ def save(model, model_dir):
     else:
         model_file = os.path.join(model_dir, f'{model.id}.pickle')
         with io.open(model_file, 'wb') as f:
-            # strip object
-            if not isinstance(model, Model):
-                model = strip_model_function(model)
-                joblib.dump(model, f)
-                # Return the functionality
-                model = conform_sklearn_to_model(model.id, model)
-            else:
-                joblib.dump(model, f)
+            joblib.dump(model, f)
 
 
 def load(model, model_dir=None):
@@ -52,14 +44,11 @@ def load(model, model_dir=None):
     model_dir = model_dir or dg.Config().get_model_dir(production=True)
     model_dir = os.path.join(model_dir, model.id)
     if hasattr(model, 'load'):
-        model = model.load(model_dir)
+        return model.load(model_dir)
     else:
         model_file = os.path.join(model_dir, f'{model.id}.pickle')
         with io.open(model_file, 'rb') as f:
-            model = joblib.load(f)
-    if not isinstance(model, Model):
-        model = conform_sklearn_to_model(model.id, model)
-    return model
+            return joblib.load(f)
 
 
 class Database(object):

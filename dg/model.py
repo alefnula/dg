@@ -166,11 +166,12 @@ class Model(BaseEstimator, TransformerMixin):
             score = get_object(score)
             return score(y, self.predict(X), sample_weight=sample_weight)
         else:
-            if self._estimator_type == 'classifier':
+            estimator_type = getattr(self, '_estimator_type', None)
+            if estimator_type == 'classifier':
                 from sklearn.metrics import accuracy_score
                 return accuracy_score(y, self.predict(X),
                                       sample_weight=sample_weight)
-            elif self._estimator_type == 'regressor':
+            elif estimator_type == 'regressor':
                 from sklearn.metrics import r2_score
                 return r2_score(y, self.predict(X),
                                 sample_weight=sample_weight,
@@ -180,42 +181,38 @@ class Model(BaseEstimator, TransformerMixin):
                 return 0
 
 
-class Classifier(Model, metaclass=abc.ABCMeta):
+class ClassifierMixin(object):
     """Base class for all classifiers"""
 
     _estimator_type = 'classifier'
 
 
-class Regressor(Model, metaclass=abc.ABCMeta):
+class RegressorMixin(object):
     """Base class for all regressors"""
 
     _estimator_type = 'regressor'
 
 
-def conform_sklearn_to_model(id, obj):
-    """If the object is one of the scikit learn estimators, we add methods
-    needed to work with the data.
-    """
-    obj.id = id
-    obj.config = Config()
-    obj.__str__ = types.MethodType(Model.__str__, obj)
-    obj.fit_dataset = types.MethodType(Model.fit_dataset, obj)
-    obj.predict_dataset = types.MethodType(Model.predict_dataset, obj)
-    obj.transform_dataset = types.MethodType(Model.transform_dataset, obj)
-    obj.score = types.MethodType(Model.score, obj)
-    if not hasattr(obj, '_estimator_type'):
-        obj._estimator_type = None
-    return obj
+class SklearnModel(Model, metaclass=abc.ABCMeta):
+    def __init__(self):
+        super().__init__()
+        self.model_ = None
 
+    @abc.abstractmethod
+    def model_fn(self):
+        """Function that creates a tensorflow model.
+        """
 
-def strip_model_function(obj):
-    del obj.config
-    del obj.__str__
-    del obj.fit_dataset
-    del obj.predict_dataset
-    del obj.transform_dataset
-    del obj.score
-    return obj
+    def fit(self, X, y=None):
+        self.model_ = self.model_fn()
+        self.model_.fit(X, y)
+        return self
+
+    def predict(self, X):
+        return self.model_.predict(X)
+
+    def transform(self, X):
+        return self.model_.transform(X)
 
 
 class TensorflowModel(Model, metaclass=abc.ABCMeta):

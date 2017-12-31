@@ -9,7 +9,7 @@ import subprocess
 from datetime import datetime
 from collections import OrderedDict
 from dg.exceptions import ConfigNotFound
-from tea.utils import get_object, Loader
+from tea.utils import Loader
 from tea.dsa.singleton import Singleton
 
 
@@ -135,8 +135,7 @@ class Config(Singleton):
             dict: {model_name: model_class}
         """
         if self.__models is None:
-            from dg.model import Model, conform_sklearn_to_model
-            from sklearn.base import BaseEstimator
+            from dg.model import Model
 
             loader = Loader()
             loader.load(f'{self.project_name}.models')
@@ -152,16 +151,8 @@ class Config(Singleton):
                 # dictionary
                 for estimator in estimators:
                     obj = getattr(module, estimator)
-                    if isinstance(obj, Model):
-                        models_dict[obj.id] = obj
-                    elif isinstance(obj, BaseEstimator):
-                        model_id = getattr(obj, 'id', estimator)
-                        models_dict[model_id] = conform_sklearn_to_model(
-                            model_id, obj
-                        )
-                    elif isinstance(obj, type) and issubclass(obj, Model):
-                        models_dict[obj.id] = obj()
-
+                    if isinstance(obj, type) and issubclass(obj, Model):
+                        models_dict[obj.id] = obj(**self.get_params(obj.id))
             self.__models = OrderedDict([
                 (model_id, models_dict[model_id])
                 for model_id in sorted(models_dict.keys())
