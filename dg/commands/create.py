@@ -34,28 +34,25 @@ features: []
 targets: []
 
 metrics:
-    score: sklearn.metrics.accuracy_score
-    class: dg.metrics.Metrics
-    all:
-        - name: accuracy
-          func: sklearn.metrics.accuracy_score
-        - name: log_loss
-          func: sklearn.metrics.log_loss 
+  score: sklearn.metrics.accuracy_score
+  class: dg.metrics.Metrics
+  all:
+    - name: accuracy
+      func: sklearn.metrics.accuracy_score
+    - name: log_loss
+      func: sklearn.metrics.log_loss 
 
 models: {{}}
 
 grid: {{}}
 
 datasets:
+  _:
     meta: clean/meta.yaml
-    full_set: clean/dataset.csv
-    train_set: evaluation/train.csv
-    eval_set: evaluation/eval.csv
-    test_set: evaluation/test.csv
-    export_set: export/export.csv
-
-functions:
-  export: {project_name}.export.export
+    full: clean/dataset.csv
+    train: evaluation/train.csv
+    eval: evaluation/eval.csv
+    test: evaluation/test.csv
 
 server:
   class: {project_name}.server.Server

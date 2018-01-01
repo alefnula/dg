@@ -3,21 +3,22 @@ __date__ = ' 16 December 2017'
 __copyright__ = 'Copyright (c)  2017 Viktor Kerkez'
 
 import dg
+import pandas as pd
+from copy import deepcopy
 from dg.utils import bar
 from dg import persistence
-from dg.metrics import Metrics
-import pandas as pd
-from tea.utils import get_object
+from dg.config import Config
+from dg.enums import Mode, Dataset
 
 
-def train_model(model, train_set, eval_set=None, model_dir=None, save=False,
+def train_model(model, train_set, eval_set, model_dir=None, save=False,
                 verbose=False):
     """Train a single model and save it
 
     Args:
-        model: Model to train
-        train_set (str): Path to the training dataset
-        eval_set (str): Optional path to the evaluation dataset
+        model (dg.Model): Model to train
+        train_set (str): Dataset to train on
+        eval_set (str): Dataset to use for evaluation during training
         model_dir (str): Path to the directory where the model should be saved
         save (bool): Save the model
         verbose (bool): Print details
@@ -37,11 +38,12 @@ def train(models, train_set, eval_set=None, verbose=False):
     Args:
         models (list of str): Model names. Pass if you want to train a just a
             set particular models
-        train_set (str): Path to the training dataset
-        eval_set (str): Optional path to the evaluation dataset
+        train_set (dg.enums.Dataset): Dataset to train on
+        eval_set (dg.enums.Dataset): Dataset to use for evaluation during
+            training.
         verbose (bool): Print details
     """
-    config = dg.Config()
+    config = Config()
     model_dir = config.get_model_dir()
     if verbose:
         print('Model dir: ', model_dir)
@@ -50,27 +52,31 @@ def train(models, train_set, eval_set=None, verbose=False):
         model = config.models[model_id].set_params(
             **config.get_params(model_id)
         )
+        datasets = config.get_datasets(model.id)
         train_model(
-            model, train_set, eval_set, model_dir, save=True, verbose=verbose
+            model,
+            train_set=datasets[train_set.value],
+            eval_set=None if eval_set is None else datasets[eval_set.value],
+            model_dir=model_dir, save=True, verbose=verbose
         )
         bar(verbose=verbose)
 
 
 def print_metrics(metrics):
     """Pretty print the metrics"""
-    if metrics[Metrics.TRAIN]:
+    if metrics[Mode.TRAIN.value]:
         print('Train:')
-        for key, value in metrics[Metrics.TRAIN].items():
+        for key, value in metrics[Mode.TRAIN.value].items():
             print(f'\t{key}:\t{value:.4f}')
 
-    if metrics[Metrics.EVAL]:
+    if metrics[Mode.EVAL.value]:
         print('Eval:')
-        for key, value in metrics[Metrics.EVAL].items():
+        for key, value in metrics[Mode.EVAL.value].items():
             print(f'\t{key}:\t{value:.4f}')
 
-    if metrics[Metrics.TEST]:
+    if metrics[Mode.TEST.value]:
         print('Test:')
-        for key, value in metrics[Metrics.TEST].items():
+        for key, value in metrics[Mode.TEST.value].items():
             print(f'\t{key}:\t{value:.4f}')
 
 
@@ -83,37 +89,51 @@ def metrics_to_dict(model, metrics):
     return d
 
 
-def evaluate_model(model, metrics, verbose=False):
+def columns():
+    config = Config()
+    cols = ['model']
+    for ds in Dataset.for_eval():
+        for metric in config.get('metrics.all', {}):
+            cols.append(f'{ds.value}-{metric}')
+    return cols
+
+
+def evaluate_model(model, datasets, verbose=False):
     """Evaluate a single model
 
     Args:
-        model: Model to evaluate
-        metrics (dg.metrics.Metrics): Dictionary of metrics objects
+        model (dg.Model): Model to evaluate
+        datasets (list of dg.enums.Dataset): List of datasets used for
+            evaluation.
         verbose (bool): Print details
     Returns:
         dict: Evaluation metrics
     """
+    config = Config()
+    metrics = config.get('metrics.all', {})
     if verbose:
         print('Evaluating:', model.id)
     db = persistence.Database()
     old_metrics = db.get(model)
-    datasets = [ds for ds in metrics.ALL if old_metrics[ds] is None]
-    new_metrics = metrics.evaluate(model, datasets=datasets)
-    merged_metrics = {}
-    for ds in metrics.ALL:
-        if old_metrics[ds] is not None:
-            merged_metrics[ds] = old_metrics[ds]
-        else:
-            merged_metrics[ds] = new_metrics[ds]
-    if old_metrics != merged_metrics:
-        db.add(model, merged_metrics)
+    new_metrics = deepcopy(old_metrics)
+    model_datasets = config.get_datasets(model.id)
+    for ds in datasets:
+        if (
+            new_metrics.get(ds.value, None) is None and
+            model_datasets[ds.value] is not None
+        ):
+            new_metrics[ds.value] = model.score_dataset(
+                model_datasets[ds.value], metrics=metrics
+            )
+
+    if old_metrics != new_metrics:
+        db.add(model, new_metrics)
     if verbose:
-        print_metrics(merged_metrics)
-    return metrics_to_dict(model, merged_metrics)
+        print_metrics(new_metrics)
+    return metrics_to_dict(model, new_metrics)
 
 
-def evaluate(models, train_set=None, eval_set=None, test_set=None,
-             verbose=False):
+def evaluate(models, datasets, verbose=False):
     """Evaluate all models and print out the metrics for evaluation.
 
     Evaluation is using the production model.
@@ -121,51 +141,46 @@ def evaluate(models, train_set=None, eval_set=None, test_set=None,
     Args:
         models (list of str): Model names. Pass if you want to evaluate just a
             set of particular models.
-        train_set (str): Path to the training dataset
-        eval_set (str): Optional path to the evaluation dataset
-        test_set (str): Path to the test dataset
+        datasets (list of dg.enums.Dataset): List of datasets used for
+            evaluation.
         verbose (bool): Print details
     """
-    config = dg.Config()
-    metrics_class = get_object(config['metrics.class'])
-    metrics = metrics_class(train_set, eval_set, test_set)
-
+    config = Config()
     all_metrics = []
     bar(verbose=verbose)
     for name in models:
         model = persistence.load(config.models[name])
-        all_metrics.append(evaluate_model(model, metrics, verbose=verbose))
+        all_metrics.append(evaluate_model(model, datasets, verbose=verbose))
         bar(verbose=verbose)
 
-    df = pd.DataFrame(all_metrics, columns=['model'] + metrics.columns())
+    df = pd.DataFrame(all_metrics, columns=columns())
     return df
 
 
-def train_and_evaluate(models, train_set=None, eval_set=None, test_set=None,
-                       verbose=False):
+def train_and_evaluate(models, datasets, verbose=False):
     """Train end evaluate models and print out the metrics for evaluation
 
     Args:
         models (list of str): Model names. Pass if you want to train/evaluate
             just a set of particular models
-        train_set (str): Path to the training dataset
-        eval_set (str): Optional path to the evaluation dataset
-        test_set (str): Path to the test dataset
+        datasets (list of dg.enums.Dataset): List of datasets used for
+            evaluation.
         verbose (bool): Print details
 
     """
     config = dg.Config()
-    metrics_class = get_object(config['metrics.class'])
-    metrics = metrics_class(train_set, eval_set, test_set)
     all_metrics = []
     bar(verbose=verbose)
     for model_id in models:
         model = config.models[model_id].set_params(
             **config.get_params(model_id)
         )
-        train_model(model, train_set, eval_set, save=False, verbose=verbose)
-        all_metrics.append(evaluate_model(model, metrics, verbose=verbose))
+        dss = config.get_datasets(model.id)
+        train_model(model, train_set=dss[Dataset.TRAIN.value],
+                    eval_set=dss[Dataset.EVAL.value], save=False,
+                    verbose=verbose)
+        all_metrics.append(evaluate_model(model, datasets, verbose=verbose))
         bar(verbose=verbose)
 
-    df = pd.DataFrame(all_metrics, columns=['model'] + metrics.columns())
+    df = pd.DataFrame(all_metrics, columns=columns())
     return df

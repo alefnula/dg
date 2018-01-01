@@ -8,6 +8,7 @@ import yaml
 import subprocess
 from datetime import datetime
 from collections import OrderedDict
+from dg.enums import Dataset
 from dg.exceptions import ConfigNotFound
 from tea.utils import Loader
 from tea.dsa.singleton import Singleton
@@ -25,8 +26,6 @@ class Config(Singleton):
         features (list of str): List of feature columns in the dataset
         targets (list of str): List of target columns in the dataset
         meta (dict): Metadata about the dataset
-        datasets (dict): Dictionary of datasets
-        functions (dict): Dictionary of functions
     """
     def __init__(self, path=None):
         """
@@ -74,24 +73,12 @@ class Config(Singleton):
 
         self.__models = None
         # Load the meta file
-        meta_file = os.path.join(self.data_dir, self['datasets.meta'])
+        meta_file = os.path.join(self.data_dir, self['datasets._.meta'])
         if os.path.isfile(meta_file):
             with io.open(meta_file) as f:
                 self.meta = yaml.safe_load(f)
         else:
             self.meta = {}
-
-        # Load datasets
-        self.datasets = {
-            dataset: (
-                os.path.join(self.data_dir, self[f'datasets.{dataset}'])
-                if self[f'datasets.{dataset}'] is not None else None
-            )
-            for dataset in self.get('datasets', {}).keys()
-        }
-
-        # Load functions
-        self.functions = self.get('functions', {})
 
     def __get(self, var):
         current = self._data
@@ -116,16 +103,38 @@ class Config(Singleton):
         except (KeyError, IndexError):
             return default
 
-    def get_params(self, name):
+    def get_params(self, model_id):
         """Returns the configuration parameters for the estimator.
 
         Args:
-            name (str): Name of the estimator
+            model_id (str): ID of the estimator
 
         Returns:
             dict: Dictionary of parameters
         """
-        return self.get(f'models.{name}', {})
+        return self.get(f'models.{model_id}', {})
+
+    def get_datasets(self, model_id=None):
+        """Returns the datasets for this estimator
+
+        Args:
+            model_id (str): ID of the estimator
+
+        Returns:
+            dict: Dictionary of datasets
+        """
+        datasets = {}
+        generic = self.get('datasets._', {})
+        for ds in Dataset:
+            datasets[ds.value] = generic.get(ds.value, None)
+        if model_id is not None:
+            model_specific = self.get(f'datasets.{model_id}', {})
+            for key, value in model_specific.items():
+                datasets[key] = value
+        return {
+            key: None if value is None else os.path.join(self.data_dir, value)
+            for key, value in datasets.items()
+        }
 
     @property
     def models(self):
@@ -151,7 +160,11 @@ class Config(Singleton):
                 # dictionary
                 for estimator in estimators:
                     obj = getattr(module, estimator)
-                    if isinstance(obj, type) and issubclass(obj, Model):
+                    if (
+                        isinstance(obj, type) and
+                        issubclass(obj, Model) and
+                        getattr(obj, 'id', None) is not None
+                    ):
                         models_dict[obj.id] = obj(**self.get_params(obj.id))
             self.__models = OrderedDict([
                 (model_id, models_dict[model_id])

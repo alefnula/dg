@@ -12,29 +12,24 @@ from dg.utils import print_and_save_df
              help='Models to train. Default: all models')
 @dg.argument('-p', '--production', action='store_true',
              help='Train for production not for evaluation')
-@dg.argument('-e', '--export', action='store_true',
-             help='Train for production from database export')
 @dg.argument('-v', '--verbose', action='store_true', help='Print details')
-def train(models=None, production=False, export=False, verbose=True):
+def train(models=None, production=False, verbose=True):
     """Train all model for production and save them
 
     Args:
         models (list of str): Model names. Pass if you want to train a just a
             set particular models,
         production (bool): Train for production or for evaluation.
-        export (bool): Train for production from database export export.
         verbose (bool): Print details
     """
     config = dg.Config()
-    train_set = (
-        config.datasets['export_set'] if export else (
-            config.datasets['full_set'] if production else
-            config.datasets['train_set']
-        )
-    )
-    eval_set = config.datasets['eval_set']
     models = models or config.models.keys()
-    train_eval.train(models, train_set, eval_set, verbose=verbose)
+    train_eval.train(
+        models,
+        train_set=dg.Dataset.FULL if production else dg.Dataset.TRAIN,
+        eval_set=None if production else dg.Dataset.EVAL,
+        verbose=verbose
+    )
 
 
 @dg.command
@@ -60,10 +55,9 @@ def evaluate(models=None, test_only=False, output=None, verbose=False):
     models = models or config.models.keys()
     df = train_eval.evaluate(
         models,
-        train_set=None if test_only else config.datasets['train_set'],
-        eval_set=config.datasets['eval_set'],
-        test_set=config.datasets['test_set'],
-        verbose=verbose)
+        datasets=[dg.Dataset.TEST] if test_only else dg.Dataset.for_eval(),
+        verbose=verbose
+    )
     print_and_save_df(df, output=output)
 
 
@@ -89,8 +83,7 @@ def train_and_evaluate(models=None, test_only=False, output=None,
     models = models or config.models.keys()
     df = train_eval.train_and_evaluate(
         models,
-        train_set=None if test_only else config.datasets['train_set'],
-        eval_set=config.datasets['eval_set'],
-        test_set=config.datasets['test_set'],
-        verbose=verbose)
+        datasets=[dg.Dataset.TEST] if test_only else dg.Dataset.for_eval(),
+        verbose=verbose
+    )
     print_and_save_df(df, output=output)

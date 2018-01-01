@@ -12,9 +12,10 @@ def shell():
     from IPython import embed
 
     config = dg.Config()
-    models = {model.id: model for model in config.models.values()}
-    user_ns = {
-        'config': config,
-        'models': models
+    user_ns = {'config': config}
+    models = {
+        model.__class__.__name__: model
+        for model in config.models.values()
     }
+    user_ns.update(models)
     embed(user_ns=user_ns)

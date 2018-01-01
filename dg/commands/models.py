@@ -13,6 +13,9 @@ from textwrap import TextWrapper
 def models(params=False):
     """Lists all models with some additional info"""
     config = dg.Config()
+    if len(config.models) == 0:
+        return
+
     longest = max(map(len, config.models.keys()))
 
     for model_id, model in config.models.items():
