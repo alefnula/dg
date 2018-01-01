@@ -125,7 +125,6 @@ def evaluate_model(model, datasets, verbose=False):
             new_metrics[ds.value] = model.score_dataset(
                 model_datasets[ds.value], metrics=metrics
             )
-
     if old_metrics != new_metrics:
         db.add(model, new_metrics)
     if verbose:
