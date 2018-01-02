@@ -56,8 +56,7 @@ def grid(model, test_only=False, output=None, verbose=True):
         model.set_params(**params)
         train_model(model,
                     train_set=datasets[Dataset.TRAIN.value],
-                    eval_set=datasets[Dataset.EVAL.value]
-        )
+                    eval_set=datasets[Dataset.EVAL.value])
         metrics.append(evaluate_model(
             model,
             datasets=[Dataset.TEST] if test_only else Dataset.for_eval(),

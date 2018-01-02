@@ -10,15 +10,23 @@ import numpy as np
 from dg.persistence import metrics_sql as sql
 
 
-SINGLE_TYPES = {int, str, float, bool, type(None)} | set(np.typeDict.values())
+SINGLE_TYPES = {int, str, float, bool, type(None)}
+NUMPY_TYPES = set(np.typeDict.values())
 
 
 def convert(x):
     t = type(x)
     if t in SINGLE_TYPES:
         return x
-    elif t in (list, tuple, set):
-        return t(convert(i) for i in x)
+    elif t in NUMPY_TYPES:
+        return x.item()
+    elif t in (list, tuple, set, np.ndarray):
+        return [convert(i) for i in x]
+    elif t == dict:
+        return {
+            str(key): convert(value)
+            for key, value in x.items()
+        }
     elif t == type:
         return x.__name__
     else:
@@ -26,11 +34,10 @@ def convert(x):
 
 
 def encode_dict(d):
-    params = {
+    return json.dumps({
         str(name): convert(value)
         for name, value in d.items()
-    }
-    return json.dumps(params, sort_keys=True)
+    }, sort_keys=True)
 
 
 def hash_dict(d):
@@ -65,7 +72,7 @@ class Database(object):
             cur = c.cursor()
             params_json = encode_dict(model.get_params())
             params_hash = hash_dict(model.get_params())
-            metrics_json = json.dumps(metrics, sort_keys=True)
+            metrics_json = encode_dict(metrics)
             cur.execute(sql.INSERT_SQL,
                         (model.id, params_hash, params_json, metrics_json))
             c.commit()
@@ -74,7 +81,7 @@ class Database(object):
         with sqlite3.connect(self.config.metrics_db) as c:
             cur = c.cursor()
             params_hash = hash_dict(model.get_params())
-            metrics_json = json.dumps(metrics, sort_keys=True)
+            metrics_json = encode_dict(metrics)
             cur.execute(sql.UPDATE_SQL, (metrics_json, model.id, params_hash))
 
     def metrics(self, models):

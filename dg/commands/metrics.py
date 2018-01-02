@@ -10,7 +10,7 @@ from dg.persistence import Database
 
 
 @dg.command
-@dg.argument('-m', '--model', action='append', help='Model id')
+@dg.argument('-m', '--model', action='append', required=True, help='Model id')
 @dg.argument('-p', '--params', action='store_true', help='Show params')
 @dg.argument('-s', '--sort', help='Metrics key on which to sort')
 @dg.argument('-d', '--descending', action='store_true',

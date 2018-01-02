@@ -93,8 +93,12 @@ def columns():
     config = Config()
     cols = ['model']
     for ds in Dataset.for_eval():
-        for metric in config.get('metrics.all', {}):
-            cols.append(f'{ds.value}-{metric}')
+        metrics = config.get('metrics.all', None)
+        if metrics is None:
+            cols.append(f'{ds.value}-score')
+        else:
+            for metric in metrics:
+                cols.append(f'{ds.value}-{metric}')
     return cols
 
 
@@ -110,7 +114,7 @@ def evaluate_model(model, datasets, verbose=False):
         dict: Evaluation metrics
     """
     config = Config()
-    metrics = config.get('metrics.all', {})
+    metrics = config.get('metrics.all', None)
     if verbose:
         print('Evaluating:', model.id)
     db = persistence.Database()
@@ -122,9 +126,12 @@ def evaluate_model(model, datasets, verbose=False):
             new_metrics.get(ds.value, None) is None and
             model_datasets[ds.value] is not None
         ):
-            new_metrics[ds.value] = model.score_dataset(
-                model_datasets[ds.value], metrics=metrics
+            score = model.score_dataset(model_datasets[ds.value],
+                                        metrics=metrics)
+            new_metrics[ds.value] = (
+                score if isinstance(score, dict) else {'score': score}
             )
+    print('new metrics', new_metrics)
     if old_metrics != new_metrics:
         db.add(model, new_metrics)
     if verbose:

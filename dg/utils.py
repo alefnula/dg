@@ -35,7 +35,7 @@ def print_and_save_df(df, output=None):
     if output:
         output = ensure_dir(output)
         df.to_csv(output, index=False, float_format='%.4f')
-    print(df.to_string(justify='right', float_format='%.4f'))
+    print(df.to_string(justify='right', float_format='%.4f', index=False))
 
 
 def bar(n=79, verbose=True):

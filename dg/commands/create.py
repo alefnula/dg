@@ -37,10 +37,8 @@ metrics:
   score: sklearn.metrics.accuracy_score
   class: dg.metrics.Metrics
   all:
-    - name: accuracy
-      func: sklearn.metrics.accuracy_score
-    - name: log_loss
-      func: sklearn.metrics.log_loss 
+    accuracy: sklearn.metrics.accuracy_score
+    log-loss: sklearn.metrics.log_loss
 
 models: {{}}
 

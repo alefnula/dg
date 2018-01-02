@@ -5,6 +5,7 @@ __copyright__ = 'Copyright (c)  2017 Viktor Kerkez'
 import io
 import os
 import abc
+import glob
 import yaml
 from tea import shell
 from dg.config import Config
@@ -83,16 +84,16 @@ class TensorflowModel(Model, metaclass=abc.ABCMeta):
         if eval_set:
             experiment.train_and_evaluate()
         else:
-            experiment.fit()
+            experiment.train()
 
-    def predict(self, features):
+    def predict(self, X):
         import numpy as np
         import tensorflow as tf
 
         # Predictions is a generator
         predictions = self.estimator.predict(
             input_fn=tf.estimator.inputs.pandas_input_fn(
-                x=features, shuffle=False, num_epochs=1
+                x=X, shuffle=False, num_epochs=1
             )
         )
         return np.array(list(predictions))
@@ -105,6 +106,21 @@ class TensorflowModel(Model, metaclass=abc.ABCMeta):
         )
         return np.array(list(predictions))
 
+    def score_dataset(self, dataset, sample_weight=None, metrics=None):
+        e = self.estimator.evaluate(self.input_fn(dataset))
+        if metrics is None:
+            return e['loss']
+        else:
+            keys = metrics.keys()
+            if hasattr(self, 'METRICS_MAP'):
+                return {
+                    key: e[self.METRICS_MAP[key]] for key in keys
+                }
+            else:
+                return {
+                    key: e.get(key, None) for key in keys
+                }
+
     def save(self, model_dir):
         """Saves the tensorflow model.
 
@@ -112,8 +128,11 @@ class TensorflowModel(Model, metaclass=abc.ABCMeta):
             model_dir (str): Path to the directory where the model should be
                 saved.
         """
-        shell.gcopy(os.path.join(self.model_dir, '*'), f'{model_dir}/')
-        with io.open(os.path.join(model_dir, 'params.yaml')) as f:
+        for item in glob.glob(os.path.join(self.model_dir, '*')):
+            shell.copy(item, os.path.join(
+                model_dir, item.replace(self.model_dir, '', 1).lstrip('/')
+            ))
+        with io.open(os.path.join(model_dir, 'params.yaml'), 'w') as f:
             yaml.safe_dump(self.get_params(), f)
 
     @classmethod
