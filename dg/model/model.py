@@ -99,14 +99,41 @@ class Model(BaseEstimator, TransformerMixin):
     def predict_dataset(self, dataset):
         """Default implementation of the predict dataset function.
 
-        This function receives a path to the dataset and target labels, reads
-        the files from disk and predicts values.
+        This function receives a path to the dataset, reads the files from disk
+        and predicts values.
 
         Args:
             dataset (str): Path to the dataset csv
         """
         X, _ = self.input_fn(dataset, Mode.PREDICT)
         return self.predict(X)
+
+    # Optional
+    def predict_proba(self, X):
+        """Return probability estimates for the test vector X.
+
+        Args:
+            X (array-like, shape = [n_samples, n_features]):
+                Input samples.
+
+        Returns:
+            C (array-like, shape = [n_samples, n_classes]):
+                Returns the probability of the samples for each class in the
+                model. The columns correspond to the classes in sorted order,
+                as they appear in the training dataset.
+        """
+
+    def predict_proba_dataset(self, dataset):
+        """Default implementation of the predict proba dataset function.
+
+        This function receives a path to the dataset, reads the files from disk
+        and predicts values.
+
+        Args:
+            dataset (str): Path to the dataset csv
+        """
+        X, _ = self.input_fn(dataset, Mode.PREDICT)
+        return self.predict_proba(X)
 
     # Optional
     def transform(self, X):
@@ -183,20 +210,23 @@ class Model(BaseEstimator, TransformerMixin):
 
         # If metrics are None try to get the scoring function from the
         # configuration file
+        proba = self.conrig.get('metrics.proba', False)
         score = self.config.get('metrics.score', None)
+        predict_func = self.predict_proba if proba else self.predict
+
         if score is not None:
-            return get_object(score)(y, self.predict(X),
+            return get_object(score)(y, predict_func(X),
                                      sample_weight=sample_weight)
 
         # Finally try the default estimators for classification and regression
         estimator_type = getattr(self, '_estimator_type', None)
         if estimator_type == 'classifier':
             from sklearn.metrics import accuracy_score
-            return accuracy_score(y, self.predict(X),
+            return accuracy_score(y, predict_func(X),
                                   sample_weight=sample_weight)
         elif estimator_type == 'regressor':
             from sklearn.metrics import r2_score
-            return r2_score(y, self.predict(X),
+            return r2_score(y, predict_func(X),
                             sample_weight=sample_weight,
                             multioutput='variance_weighted')
         else:

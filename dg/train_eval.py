@@ -12,7 +12,7 @@ from dg.enums import Mode, Dataset
 
 
 def train_model(model, train_set, eval_set, model_dir=None, save=False,
-                verbose=False):
+                silent=False):
     """Train a single model and save it
 
     Args:
@@ -21,18 +21,18 @@ def train_model(model, train_set, eval_set, model_dir=None, save=False,
         eval_set (str): Dataset to use for evaluation during training
         model_dir (str): Path to the directory where the model should be saved
         save (bool): Save the model
-        verbose (bool): Print details
+        silent (bool): Don't print details to standard out.
     """
-    if verbose:
+    if not silent:
         print('Training:', model.id)
     model.fit_dataset(train_set, eval_set)
     if save:
-        if verbose:
+        if not silent:
             print('Saving:', model.id)
         persistence.save(model, model_dir)
 
 
-def train(models, train_set, eval_set=None, verbose=False):
+def train(models, train_set, eval_set=None, silent=False):
     """Train all model for production and save them
 
     Args:
@@ -41,13 +41,13 @@ def train(models, train_set, eval_set=None, verbose=False):
         train_set (dg.enums.Dataset): Dataset to train on
         eval_set (dg.enums.Dataset): Dataset to use for evaluation during
             training.
-        verbose (bool): Print details
+        silent (bool): Don't print details to standard out.
     """
     config = Config()
     model_dir = config.get_model_dir()
-    if verbose:
+    if not silent:
         print('Model dir: ', model_dir)
-    bar(verbose=verbose)
+    bar(silent=silent)
     for model_id in models:
         model = config.models[model_id].set_params(
             **config.get_params(model_id)
@@ -57,9 +57,9 @@ def train(models, train_set, eval_set=None, verbose=False):
             model,
             train_set=datasets[train_set.value],
             eval_set=None if eval_set is None else datasets[eval_set.value],
-            model_dir=model_dir, save=True, verbose=verbose
+            model_dir=model_dir, save=True, silent=silent
         )
-        bar(verbose=verbose)
+        bar(silent=silent)
 
 
 def print_metrics(metrics):
@@ -102,20 +102,20 @@ def columns():
     return cols
 
 
-def evaluate_model(model, datasets, verbose=False):
+def evaluate_model(model, datasets, silent=False):
     """Evaluate a single model
 
     Args:
         model (dg.Model): Model to evaluate
         datasets (list of dg.enums.Dataset): List of datasets used for
             evaluation.
-        verbose (bool): Print details
+        silent (bool): Don't print details to standard out.
     Returns:
         dict: Evaluation metrics
     """
     config = Config()
     metrics = config.get('metrics.all', None)
-    if verbose:
+    if not silent:
         print('Evaluating:', model.id)
     db = persistence.Database()
     old_metrics = db.get(model)
@@ -131,15 +131,14 @@ def evaluate_model(model, datasets, verbose=False):
             new_metrics[ds.value] = (
                 score if isinstance(score, dict) else {'score': score}
             )
-    print('new metrics', new_metrics)
     if old_metrics != new_metrics:
         db.add(model, new_metrics)
-    if verbose:
+    if not silent:
         print_metrics(new_metrics)
     return metrics_to_dict(model, new_metrics)
 
 
-def evaluate(models, datasets, verbose=False):
+def evaluate(models, datasets, silent=False):
     """Evaluate all models and print out the metrics for evaluation.
 
     Evaluation is using the production model.
@@ -149,21 +148,21 @@ def evaluate(models, datasets, verbose=False):
             set of particular models.
         datasets (list of dg.enums.Dataset): List of datasets used for
             evaluation.
-        verbose (bool): Print details
+        silent (bool): Don't print details to standard out.
     """
     config = Config()
     all_metrics = []
-    bar(verbose=verbose)
+    bar(silent=silent)
     for name in models:
         model = persistence.load(config.models[name])
-        all_metrics.append(evaluate_model(model, datasets, verbose=verbose))
-        bar(verbose=verbose)
+        all_metrics.append(evaluate_model(model, datasets, silent=silent))
+        bar(silent=silent)
 
     df = pd.DataFrame(all_metrics, columns=columns())
     return df
 
 
-def train_and_evaluate(models, datasets, verbose=False):
+def train_and_evaluate(models, datasets, silent=False):
     """Train end evaluate models and print out the metrics for evaluation
 
     Args:
@@ -171,12 +170,12 @@ def train_and_evaluate(models, datasets, verbose=False):
             just a set of particular models
         datasets (list of dg.enums.Dataset): List of datasets used for
             evaluation.
-        verbose (bool): Print details
+        silent (bool): Don't print details to standard out.
 
     """
     config = dg.Config()
     all_metrics = []
-    bar(verbose=verbose)
+    bar(silent=silent)
     for model_id in models:
         model = config.models[model_id].set_params(
             **config.get_params(model_id)
@@ -184,9 +183,9 @@ def train_and_evaluate(models, datasets, verbose=False):
         dss = config.get_datasets(model.id)
         train_model(model, train_set=dss[Dataset.TRAIN.value],
                     eval_set=dss[Dataset.EVAL.value], save=False,
-                    verbose=verbose)
-        all_metrics.append(evaluate_model(model, datasets, verbose=verbose))
-        bar(verbose=verbose)
+                    silent=silent)
+        all_metrics.append(evaluate_model(model, datasets, silent=silent))
+        bar(silent=silent)
 
     df = pd.DataFrame(all_metrics, columns=columns())
     return df

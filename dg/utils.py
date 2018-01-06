@@ -38,12 +38,12 @@ def print_and_save_df(df, output=None):
     print(df.to_string(justify='right', float_format='%.4f', index=False))
 
 
-def bar(n=79, verbose=True):
+def bar(n=79, silent=False):
     """Prints a horizontal bar
 
     Args:
         n (int): Length of the bar
-        verbose (bool): Condition for printing the bar:
+        silent (bool): Don't print details to standard out.
     """
-    if verbose:
+    if not silent:
         print('\n' + '-' * n + '\n')

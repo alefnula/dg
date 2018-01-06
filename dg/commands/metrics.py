@@ -10,13 +10,13 @@ from dg.persistence import Database
 
 
 @dg.command
-@dg.argument('-m', '--model', action='append', required=True, help='Model id')
+@dg.argument('-m', '--model', action='append', help='Model id')
 @dg.argument('-p', '--params', action='store_true', help='Show params')
 @dg.argument('-s', '--sort', help='Metrics key on which to sort')
 @dg.argument('-d', '--descending', action='store_true',
              help='Sort in descending order')
 @dg.argument('-o', '--output', help='Output file')
-def metrics(model, params=False, sort=None, descending=False, output=None):
+def metrics(model=None, params=False, sort=None, descending=False, output=None):
     """Show metrics from the metrics database
 
     Args:
@@ -25,13 +25,18 @@ def metrics(model, params=False, sort=None, descending=False, output=None):
         sort (str): Column name on which to sort
         descending (bool): Sort in descending order
     """
+    config = dg.Config()
+    model = model or config.models.keys()
     if params and len(model) > 1:
         print('Params can be shown only for one model')
         return
     db = Database()
     all = OrderedDict()
-    for model_id, model_params, model_metrics in db.metrics(model):
+    for model_id, timestamp, model_params, model_metrics in db.metrics(model):
         all.setdefault('model', []).append(model_id)
+        all.setdefault('timestamp', []).append(
+            timestamp.strftime('%Y.%m.%d %H:%M:%S')
+        )
         if params:
             for param, value in model_params.items():
                 all.setdefault(param, []).append(value)

@@ -25,14 +25,15 @@ def create_grid(params, grid_params):
 @dg.argument('-t', '--test-only', action='store_true',
              help='Evaluate only on test data')
 @dg.argument('-o', '--output', help='Path to the output csv file')
-@dg.argument('-v', '--verbose', action='store_true', help='Print details')
-def grid(model, test_only=False, output=None, verbose=True):
+@dg.argument('-s', '--silent', action='store_true', help='Don\'t show details')
+def grid(model, test_only=False, output=None, silent=False):
     """Implement grid search for model
 
     Args:
         model (str): Model name for which we want to do a grid search.
         test_only (bool): Evaluate only on test data
         output (str): Path to the output csv file
+        silent (bool): Don't print details to standard out.
     """
     config = dg.Config()
     model = config.models[model]
@@ -48,21 +49,27 @@ def grid(model, test_only=False, output=None, verbose=True):
         return
 
     metrics = []
-    bar(verbose=verbose)
+    param_cols = set()
+    bar(silent=silent)
     for i, params in enumerate(grid, 1):
-        if verbose:
+        if not silent:
             print(f'{i} out of {len(grid)}')
             print(f'Params: {params}')
+        param_cols.update(params.keys())
         model.set_params(**params)
         train_model(model,
                     train_set=datasets[Dataset.TRAIN.value],
                     eval_set=datasets[Dataset.EVAL.value])
-        metrics.append(evaluate_model(
+        m = evaluate_model(
             model,
             datasets=[Dataset.TEST] if test_only else Dataset.for_eval(),
-            verbose=verbose
-        ))
+            silent=silent
+        )
+        m.update(params)
+        metrics.append(m)
+        bar(silent=silent)
     import pandas as pd
 
-    df = pd.DataFrame(metrics, columns=columns())
+    cols = ['model'] + sorted(param_cols) + columns()[1:]
+    df = pd.DataFrame(metrics, columns=cols)
     print_and_save_df(df, output)

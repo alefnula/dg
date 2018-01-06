@@ -13,13 +13,13 @@ from dg.utils import ensure_dir, bar
 @dg.command
 @dg.argument('-m', '--model', action='append', dest='models',
              help='Models do deploy. Default: All found models')
-@dg.argument('-v', '--verbose', action='store_true', help='Print details')
-def deploy(models=None, verbose=False):
+@dg.argument('-s', '--silent', action='store_true', help='Don\'t show details')
+def deploy(models=None, silent=False):
     """Deploy the latest model to production
 
     Args:
         models (list of str): Names of the models we want to deploy
-        verbose (bool): Print details
+        silent (bool): Don't print details to standard out.
     """
     config = dg.Config()
     production_dir = config.get_model_dir(production=True)
@@ -42,9 +42,9 @@ def deploy(models=None, verbose=False):
 
     ensure_dir(production_dir, directory=True)
 
-    bar(verbose=verbose)
+    bar(silent=silent)
     for model in models:
-        if verbose:
+        if not silent:
             print('Deploying model:', model)
         source = os.path.join(latest, model)
         # If the model is trained in the latest training batch
@@ -53,4 +53,4 @@ def deploy(models=None, verbose=False):
             if os.path.isdir(destination):
                 shutil.rmtree(destination)
             shutil.copytree(source, destination)
-        bar(verbose=verbose)
+        bar(silent=silent)

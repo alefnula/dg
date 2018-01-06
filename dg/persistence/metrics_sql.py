@@ -7,19 +7,22 @@ CREATE_TABLE = '''
 CREATE TABLE IF NOT EXISTS results (
   id INTEGER PRIMARY KEY,
   model VARCHAR(256),
-  hash VARCHAR(64) UNIQUE,
+  hash VARCHAR(64),
+  [timestamp] TIMESTAMP,
   parameters VARCHAR,
-  metrics VARCHAR
+  metrics VARCHAR,
+  UNIQUE(model, hash) ON CONFLICT REPLACE
 );
 '''
 
-CREATE_INDEX = '''
-CREATE UNIQUE INDEX IF NOT EXISTS hash_index ON results(hash);
-'''
+CREATE_INDEX = [
+    'CREATE INDEX IF NOT EXISTS model_index ON results(model);',
+    'CREATE INDEX IF NOT EXISTS hash_index ON results(hash);'
+]
 
 INSERT_SQL = '''
-INSERT INTO results (model, hash, parameters, metrics)
-VALUES (?, ?, ?, ?);
+INSERT INTO results (model, hash, timestamp, parameters, metrics)
+VALUES (?, ?, ?, ?, ?);
 '''
 
 SELECT_SQL = '''
@@ -33,7 +36,7 @@ WHERE model = ? AND hash = ?;
 '''
 
 METRICS_SELECT = '''
-SELECT model, parameters, metrics
+SELECT model, timestamp, parameters, metrics
 FROM results
 WHERE model IN ({});
 '''
