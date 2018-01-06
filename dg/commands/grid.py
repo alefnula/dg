@@ -4,6 +4,7 @@ __copyright__ = 'Copyright (c)  2017 Viktor Kerkez'
 
 from copy import deepcopy
 import dg
+from datetime import datetime
 from dg.enums import Dataset
 from dg.utils import bar, print_and_save_df
 from dg.train_eval import train_model, evaluate_model, columns
@@ -35,6 +36,8 @@ def grid(model, test_only=False, output=None, silent=False):
         output (str): Path to the output csv file
         silent (bool): Don't print details to standard out.
     """
+    import pandas as pd
+
     config = dg.Config()
     model = config.models[model]
     grid_params = config[f'grid.{model.id}']
@@ -52,6 +55,7 @@ def grid(model, test_only=False, output=None, silent=False):
     param_cols = set()
     bar(silent=silent)
     for i, params in enumerate(grid, 1):
+        start = datetime.now()
         if not silent:
             print(f'{i} out of {len(grid)}')
             print(f'Params: {params}')
@@ -67,9 +71,16 @@ def grid(model, test_only=False, output=None, silent=False):
         )
         m.update(params)
         metrics.append(m)
+        cols = ['model'] + sorted(param_cols) + columns()[1:]
+        df = pd.DataFrame([m], columns=cols)
+        print_and_save_df(df)
+        diff = datetime.now() - start
+        total_seconds = diff.total_seconds()
+        print('Duration: {:.0f}:{:.0f}:{:.0f}'.format(
+            total_seconds // 3600, (total_seconds % 3600) // 60,
+            total_seconds % 60
+        ))
         bar(silent=silent)
-    import pandas as pd
 
-    cols = ['model'] + sorted(param_cols) + columns()[1:]
     df = pd.DataFrame(metrics, columns=cols)
     print_and_save_df(df, output)
