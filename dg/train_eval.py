@@ -47,18 +47,23 @@ def train(models, train_set, eval_set=None, silent=False):
     model_dir = config.get_model_dir()
     if not silent:
         print('Model dir: ', model_dir)
+
     bar(silent=silent)
     for model_id in models:
         model = config.models[model_id].set_params(
             **config.get_params(model_id)
         )
         datasets = config.get_datasets(model.id)
-        train_model(
-            model,
-            train_set=datasets[train_set.value],
-            eval_set=None if eval_set is None else datasets[eval_set.value],
-            model_dir=model_dir, save=True, silent=silent
+        train_set = (
+            datasets[train_set.value] if isinstance(train_set, Dataset)
+            else train_set
         )
+        eval_set = (
+            datasets[eval_set.value] if isinstance(eval_set, Dataset)
+            else eval_set
+        )
+        train_model(model, train_set=train_set, eval_set=eval_set,
+                    model_dir=model_dir, save=True, silent=silent)
         bar(silent=silent)
 
 
